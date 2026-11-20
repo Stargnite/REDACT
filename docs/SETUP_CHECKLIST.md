@@ -214,6 +214,78 @@ empty template. Fetching an empty template is harmless, but publishing one avoid
 confusing error. The Firebase guide also suggests Remote Config for moving model settings without
 republishing the app; that is a nice-to-have, not a blocker.
 
+### A9. Confirm Gemini Nano is live in **your** Chrome — **you only**
+
+This is the demo's central claim, and it can only be checked in your own browser. My browser is a
+throwaway profile (`~/.cache/chrome-devtools-mcp/chrome-profile`) with no on-device model in it, so
+every "on-device unavailable" I report is a false negative. Do not trust it either way.
+
+**Step 1 — the app itself (30 seconds).** Open `https://redact-fdd1a.web.app/scan/` in your
+Chrome. Paste a paragraph that a regex cannot catch, for example:
+
+```
+Hi, I'm Priya Raman. I work at Northwind Logistics and I live at 42 Larkspur Road, Leeds.
+My supervisor is Marcus Webb and the project is called Aurora.
+```
+
+Choose **ON DEVICE**, press **Scan**. If the result finds the name, the employer and the address,
+Gemini Nano ran on this machine. If it errors instead, go to step 2.
+
+**Step 2 — the definitive probe.** In the same tab open DevTools (⌥⌘I), go to **Console**, and run:
+
+```js
+await LanguageModel.availability()
+```
+
+Chrome refuses pasted code in the console: if it prints *"Warning: Don't paste code into DevTools
+Console"*, type `allow pasting`, press Enter, and paste again.
+
+| Result | Meaning |
+|---|---|
+| `"available"` | The model is downloaded and ready. This machine is good. |
+| `"downloadable"` | Chrome can get it but has not yet. Run `await LanguageModel.create()` and wait — 4 GB, minutes to tens of minutes. |
+| `"downloading"` | In progress. Wait. |
+| `"unavailable"` | Blocked. Nearly always disk space, or the flag below. |
+| `LanguageModel is not defined` | The Prompt API is off in this Chrome. Go to step 3. |
+
+To see the actual reason when it is `"unavailable"`:
+
+```js
+try { await LanguageModel.create() } catch (e) { console.log(e.name, e.message) }
+```
+
+`NotSupportedError` mentioning disk space means the gate in step 4.
+
+**Step 3 — the flag.** Open `chrome://flags/#prompt-api-for-gemini-nano` and set it to **Enabled**,
+then restart Chrome. Do the same for `chrome://flags/#optimization-guide-on-device-model` if it
+exists. If the flag does not exist in your build, the API ships on by default and step 2's
+`LanguageModel is not defined` means something else — usually an enterprise policy.
+
+**Step 4 — the disk gate.** Chrome refuses to initialise the on-device model unless there is about
+**22 GB free** on the volume that holds your Chrome profile. That was the blocker this morning: the
+disk was at 2.7 GB free and no amount of flag-fiddling would have helped. It is now 31 GB free, so
+this should pass. Check with `df -h /`. The model itself is already downloaded, at
+`~/Library/Application Support/Google/Chrome/OptGuideOnDeviceModel/2025.8.8.1141/` (4.0 GB).
+
+**Step 5 — Chrome's own view.** `chrome://on-device-internals` shows the installed model version
+and whether it is up to date. `chrome://components` lists the "Optimization Guide On Device Model"
+component. `chrome://about` has an AI status panel: green is ready, yellow is downloadable, red is
+an error.
+
+**What other people's browsers look like.** Gemini Nano is a *device* property, not a site
+property, and that is the honest version of the story to tell in the demo:
+
+- It is **Chrome only**. Safari, Firefox and iOS have no Gemini Nano, so for those visitors the
+  on-device tier cannot exist at all and the cloud tier is the only option.
+- Even in Chrome the model must be present on that machine: ~4 GB downloaded, ~22 GB free disk, a
+  supported OS, enough RAM. Many 2026 Chrome installs already have the model on disk.
+- An enterprise policy (`GenAILocalFoundationalModelSettings`) can switch it off entirely.
+
+So the app must never *claim* on-device when it did not run on-device, and it must fall back
+without breaking. It already does: the badge reads the tier that actually ran, the receipt records
+it, and a forced ON DEVICE scan that fails says so instead of quietly using the cloud. That
+truthfulness is the demo, not a limitation of it.
+
 ---
 
 ## B. Outside the repo, but not blocking (do during the build)
@@ -302,8 +374,8 @@ Firebase Hosting gives `https://redact-fdd1a.web.app` free on Spark. If you want
 | git | 2.37.1 (Apple Git-137.1) |
 | firebase-tools | 15.37.0, installed globally |
 | Firebase CLI auth | signed in as `tobyolamide22@gmail.com` |
-| Chrome | present, on-device Gemini Nano **available** and answering |
-| Free disk | ~29 GB — above the ~22 GB gate the on-device model needs |
+| Chrome | present, 158.0.8127.36 — on-device Gemini Nano model downloaded (4.0 GB), **availability in the real profile still to be confirmed by you, see A9** |
+| Free disk | 31 GB — above the ~22 GB gate the on-device model needs (was 2.7 GB this morning) |
 | `gh` | **not installed** |
 | `ffmpeg` | **not installed** |
 | Supabase | not in use, and not planned — see below |
