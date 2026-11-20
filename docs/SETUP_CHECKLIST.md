@@ -214,11 +214,21 @@ empty template. Fetching an empty template is harmless, but publishing one avoid
 confusing error. The Firebase guide also suggests Remote Config for moving model settings without
 republishing the app; that is a nice-to-have, not a blocker.
 
-### A9. Confirm Gemini Nano is live in **your** Chrome — **you only**
+### A9. Confirm Gemini Nano is live in **your** Chrome — **done, 20 Nov 2026**
+
+`await LanguageModel.availability()` returned **`"available"`** in your Chrome. The on-device tier
+is real on this machine, and the hybrid claim can be demonstrated rather than asserted.
 
 This is the demo's central claim, and it can only be checked in your own browser. My browser is a
 throwaway profile (`~/.cache/chrome-devtools-mcp/chrome-profile`) with no on-device model in it, so
 every "on-device unavailable" I report is a false negative. Do not trust it either way.
+
+**What this does and does not prove.** It proves Chrome's Prompt API is live with the model
+present, which is the same capability Firebase AI Logic's `ONLY_ON_DEVICE` mode is built on — the
+SDK reads `globalObj.LanguageModel` under the hood. It does not yet prove our own call path works
+end to end: our model is created with `expectedInputs`, `expectedOutputs` and an `initialPrompts`
+system turn, and the app then has to parse the model's JSON. The app-level check below closes
+that gap.
 
 **Step 1 — the app itself (30 seconds).** Open `https://redact-fdd1a.web.app/scan/` in your
 Chrome. Paste a paragraph that a regex cannot catch, for example:
@@ -374,7 +384,7 @@ Firebase Hosting gives `https://redact-fdd1a.web.app` free on Spark. If you want
 | git | 2.37.1 (Apple Git-137.1) |
 | firebase-tools | 15.37.0, installed globally |
 | Firebase CLI auth | signed in as `tobyolamide22@gmail.com` |
-| Chrome | present, 158.0.8127.36 — on-device Gemini Nano model downloaded (4.0 GB), **availability in the real profile still to be confirmed by you, see A9** |
+| Chrome | present, 158.0.8127.36 — on-device Gemini Nano **confirmed available** (`LanguageModel.availability()` → `"available"`, 20 Nov 2026) |
 | Free disk | 31 GB — above the ~22 GB gate the on-device model needs (was 2.7 GB this morning) |
 | `gh` | **not installed** |
 | `ffmpeg` | **not installed** |
@@ -388,7 +398,7 @@ Firebase Hosting gives `https://redact-fdd1a.web.app` free on Spark. If you want
 |---|---|---|
 | Today | Run the AI Logic setup workflow (A3) | Enables the APIs and App Check for AI Logic |
 | Today | Enable the Anonymous auth provider | Console-only |
-| Today | Open the deployed site in **your** Chrome and check the on-device tier | The only way to see Gemini Nano present |
+| Today | Run one **ON DEVICE** scan in **your** Chrome on the deployed site | Gemini Nano is present; this proves our call path end to end |
 | This week | `brew install gh` + `gh auth login` | Optional - only to manage PRs from the CLI |
 | This week | `brew install ffmpeg` | Demo video |
 | Before submission | Record + upload the video, fill in Devpost | Submission requirement |
