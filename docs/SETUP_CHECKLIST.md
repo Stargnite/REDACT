@@ -47,9 +47,10 @@ Console only. This is the free-tier path. The *Agent Platform / Vertex AI* optio
 and would force Blaze — do not pick it.
 
 **Status, 20 Nov 2026:** I have already enabled `firebasevertexai.googleapis.com` and
-`firebaseappcheck.googleapis.com` on the project from the CLI. A direct call now returns
-`Firebase AI Logic genai config not found`, which means the remaining work is exactly one console
-click: the **Get started** workflow, which writes the per-app genai config and enforces App Check.
+`firebaseappcheck.googleapis.com` on the project from the CLI. A direct call used to return
+`Firebase AI Logic genai config not found`; it now returns `429 quota exceeded`, because the
+free tier has been spent by the probe runs. The quota wall is hiding the config check, so the
+console step below is still unconfirmed and still the one thing left to do.
 
 The setup flow auto-enables **App Check for AI Logic**. Afterwards, confirm under
 **Security → App Check → APIs** that AI Logic reads **Enforced**.
@@ -58,8 +59,21 @@ The setup flow auto-enables **App Check for AI Logic**. Afterwards, confirm unde
 it (I probed the AI Logic and Firebase Management discovery docs; the resource does not exist
 outside the console).
 
-### A4. App Check → reCAPTCHA v3 — register a keypair
+### A3b. The cloud model and the free tier quota
 
+The cloud tier runs `gemini-3.8-flash` (`NEXT_PUBLIC_FIREBASE_CLOUD_MODEL` in `.env.local`).
+`gemini-2.5-flash` is closed to new projects and answers with a 404 that tells you to move to
+`gemini-3.8-flash`.
+
+The free tier is rate limited. Once the daily quota is spent, cloud calls answer
+`429 quota exceeded` for the rest of the day. Two consequences:
+
+- **Record the demo on the on-device tier.** It is the product's claim and it does not spend a
+  quota.
+- **Do not spend the quota on test paragraphs.** Every cloud scan counts against the same daily
+  allowance, so a long testing session is what leaves you unable to demo the cloud tier.
+
+### A4. App Check → reCAPTCHA v3 — register a keypair
 **Console path: Security → App Check → Apps tab → Register app.** (Not "Build".)
 
 **If the App Check page is missing, or has no "Register app" button, do A3 first.** The AI Logic
