@@ -1,0 +1,22 @@
+node_modules
+.next
+out
+build
+.DS_Store
+*.pem
+.env*
+!.env.example
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.vercel
+next-env.d.ts
+tsconfig.tsbuildinfo
+.claude/settings.local.json
+.pnpm-store
+.skill-staging
+.playwright-mcp
+
+# The source portrait. The optimised copy the site serves is
+# public/images/tobi.jpg; this is only the original it was made from.
+public/images/portfolio-img.png
