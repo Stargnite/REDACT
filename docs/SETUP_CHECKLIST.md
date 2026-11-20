@@ -7,6 +7,10 @@ open for you.** Nothing here involves writing application code — the code live
 Deadline: **Mon 30 Nov 2026, 2:00 PM PT.** Today is Fri 20 Nov 2026. That is 10 days, and the
 items below are ordered by what blocks the most downstream work.
 
+**Interval 1 (20 Nov 2026) is committed and pushed.** The app builds, the pattern tier
+runs in the browser, and 23 unit tests cover the scan pipeline. Everything below is
+what the Firebase project needs before the model tier can run.
+
 ---
 
 ## A. Blocking the build (do these first, today)
@@ -48,9 +52,11 @@ The setup flow auto-enables **App Check for AI Logic**. Afterwards, confirm unde
 **Why you:** the API enablement is tied to your Google account's AI Studio consent flow.
 
 ### A4. App Check → reCAPTCHA v3 — register a keypair
-Console only, two fields to copy:
-- **Site key** → goes in `.env.local` as `NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY`
-- **Secret key** → goes in `.env.local` as `NEXT_PUBLIC_FIREBASE_APPCHECK_SECRET_KEY`
+Console only. One field to copy:
+- **Site key** → goes in `.env.local` as `NEXT_PUBLIC_RECAPTCHA_SITE_KEY`
+
+The **secret key is not needed.** It only signs tokens server-side, and REDACT has no server. Keep
+the secret key out of the repo regardless.
 
 Register **two** domains: `localhost` and `your-project-id.web.app`.
 
@@ -102,10 +108,12 @@ confusing error.
 ## B. Outside the repo, but not blocking (do during the build)
 
 ### B1. GitHub account + a repository for the project
-Needed for the Devpost submission (the judges clone or at least open the repo) and for a
-deploy-from-source story.
+**Done, 20 Nov 2026.** The repo is `git@github.com:Stargnite/REDACT.git`, branch `main`, and the
+first commit is pushed. SSH authenticates as **Stargnite**.
 
-**Note:** `gh` (the GitHub CLI) is **not installed** on this machine. Install it with:
+`gh` (the GitHub CLI) is still **not installed** on this machine. It is not needed to push — SSH
+does that. It is only needed if you want to open and manage pull requests from the terminal.
+Install it with:
 
 ```bash
 brew install gh
@@ -117,16 +125,11 @@ then
 gh auth login
 ```
 
-If you would rather not install anything, the browser flow at github.com/settings/tokens works
-just as well — a fine-grained token with `repo` scope is all we need to push.
-
 ### B2. A git identity
-`git config user.name` / `user.email` — set per repo, not globally. A noreply GitHub email keeps
-your address off public commits.
+**Done.** `Oluwatobi <tobi.sobayo@wazobia.tech>` is set globally on this machine.
 
-### B3. Decide the repo name and the public/private choice
-For a hackathon submission, **public**. Private repos make it harder for judges to look, and
-Devpost reviewers may not have access.
+### B3. The repo name and the public/private choice
+**Done.** The repo is `Stargnite/REDACT`, public, `main` as the default branch.
 
 ### B4. The demo video — recording and editing
 Devpost submissions almost always want a 2–3 minute video, and the hackathon rules require a
@@ -196,7 +199,7 @@ it.** The `.web.app` URL is free and is what judges expect.
 | Today | Confirm the project ID (`redact-local` or one you pick) | Permanent, globally unique |
 | Today | Paste the reCAPTCHA site + secret key, and the debug token | Only shown on your screen |
 | Today | Enable the Anonymous auth provider | Console-only |
-| This week | `brew install gh` + `gh auth login` | Push the repo |
+| This week | `brew install gh` + `gh auth login` | Optional - only to manage PRs from the CLI |
 | This week | `brew install ffmpeg` | Demo video |
 | Before submission | Record + upload the video, fill in Devpost | Submission requirement |
 
