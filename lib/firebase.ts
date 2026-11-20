@@ -3,8 +3,8 @@ import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-ch
 
 /**
  * The Firebase web config. These are not secrets: a browser app cannot hold a
- * secret. The secret key, and the App Check debug token, live in .env.local
- * and are never committed.
+ * secret. The reCAPTCHA secret key, and the App Check debug token, live in
+ * .env.local and are never committed or shipped.
  */
 const config = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -31,13 +31,17 @@ export function getFirebaseApp(): FirebaseApp {
 /**
  * App Check is enforced for AI Logic, so it has to be running before the first
  * model call. The debug token lets a local build pass App Check without a
- * registered reCAPTCHA Enterprise host; it is ignored once the real host is
- * allowed.
+ * registered reCAPTCHA Enterprise host. It is a development-only affordance:
+ * `npm run build` compiles the branch out, so the deployed bundle never
+ * carries it.
  */
 export function startAppCheck(): void {
   if (appCheckStarted) return;
 
-  const debugToken = process.env.NEXT_PUBLIC_APPCHECK_DEBUG_TOKEN;
+  const debugToken =
+    process.env.NODE_ENV !== "production"
+      ? process.env.NEXT_PUBLIC_APPCHECK_DEBUG_TOKEN
+      : undefined;
   if (debugToken) {
     (globalThis as unknown as Record<string, string>).FIREBASE_APPCHECK_DEBUG_TOKEN =
       debugToken;

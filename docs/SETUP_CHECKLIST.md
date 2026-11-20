@@ -78,9 +78,11 @@ enforced, and the deployed site passes App Check. The proof:
 
 - A model request with **no** App Check token is rejected with `401 Firebase App Check token is
   invalid` — so enforcement is genuinely on for AI Logic.
-- The **deployed** site at `https://redact-fdd1a.web.app/scan/` reaches the model endpoint and
-  gets a quota error, not an App Check error. The only way to get that far is a valid App Check
-  token, which means the reCAPTCHA Enterprise provider ran in a real browser and was accepted.
+- A **cold** visit to `https://redact-fdd1a.web.app/scan/` — empty browser cache, no debug token —
+  sends `POST .../exchangeRecaptchaEnterpriseToken` and gets **200**. The model request then
+  carries an `x-firebase-appcheck` JWT whose payload says `"provider":"recaptcha_enterprise"`, so
+  the reCAPTCHA Enterprise provider really did run in a real browser and was accepted. The request
+  reaches the model endpoint and gets a quota error, not an App Check error.
 
 What you did, for the record:
 
@@ -145,6 +147,21 @@ firebase deploy --only hosting --project redact-fdd1a
 The hosting config is `firebase.json` in the repo. `NEXT_PUBLIC_` values are baked in at build
 time, so the reCAPTCHA site key has to be in `.env.local` **before** the build, not after.
 
+### A4c. There is no production environment in the console
+
+Firebase Hosting serves static files. It has no runtime environment and no env-var settings page,
+so there is nothing to look at and nothing to set — the `NEXT_PUBLIC_*` values are inlined into
+the JavaScript bundle at build time instead.
+
+- `.env.local` is the single source of truth for a build. Fill it in, then build.
+- `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` must be in `.env.local` **before** `npm run build`. Adding it
+  afterwards changes nothing until you rebuild.
+- The Firebase web config and the reCAPTCHA **site** key are in the shipped bundle by design. They
+  are not secrets — a browser app cannot hold a secret. What protects the free tier is App Check
+  and the quota, not hiding those values.
+
+`.env.example` lists every variable with an empty value.
+
 ### A5. App Check debug token — **done**
 
 **Done, 20 Nov 2026.** Created with `firebase appcheck:debugtokens:create --app <webAppId>` and
@@ -155,7 +172,12 @@ The console equivalent, if you ever need to rotate it: **Security → App Check 
 app → overflow menu → Manage debug tokens**.
 
 Paste the literal token string, not the word `true` — a literal token does not expire, `true` does.
-**Never committed to git.**
+**Never committed to git, and never shipped.** `lib/firebase.ts` reads it only when `NODE_ENV` is
+not `production`, and `npm run build` compiles that branch away. I checked the built output and
+every chunk the deployment serves: none of them contains the token. This matters more than it
+looks — anyone holding the debug token can mint App Check tokens for this app and spend the
+project's 20-a-day quota, so a token in the shipped bundle would quietly undo the whole App Check
+setup.
 
 ### A6. Auth → Sign-in method → **Anonymous** → enable
 
