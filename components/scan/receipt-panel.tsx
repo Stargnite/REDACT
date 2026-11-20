@@ -1,4 +1,5 @@
 import { Hairline, SectionLabel } from "@/components/site/section-label";
+import { explainModelError } from "@/lib/errors";
 import type { ScanResult } from "@/lib/types";
 
 function formatDuration(ms: number): string {
@@ -30,15 +31,15 @@ export function ReceiptPanel({ result }: { result: ScanResult }) {
             key={term}
             className="flex items-baseline justify-between gap-4 border-b border-hairline py-3"
           >
-            <dt className="text-faint">{term}</dt>
-            <dd className="text-text">{value}</dd>
+            <dt className="shrink-0 text-faint">{term}</dt>
+            <dd className="min-w-0 break-words text-right text-text">{value}</dd>
           </div>
         ))}
       </dl>
 
       {result.degradedReason ? (
         <p className="mono mt-4 text-faint">
-          MODEL TIER UNAVAILABLE · {result.degradedReason}
+          MODEL TIER · {explainModelError(result.degradedReason).label}
         </p>
       ) : null}
     </div>

@@ -9,6 +9,15 @@ const OPTIONS: { value: ScanMode; label: string; hint: string }[] = [
 ];
 
 /**
+ * The hint for the active option, shown as text. A title attribute is
+ * invisible on a phone, and on a phone the choice between on device and
+ * cloud is the whole point of the control.
+ */
+export function modeHint(value: ScanMode): string {
+  return OPTIONS.find((option) => option.value === value)?.hint ?? "";
+}
+
+/**
  * Three states, one accent. The active button is the only vermilion thing
  * in the group, and the choice is a radiogroup so a screen reader announces
  * it as one of three options rather than three buttons.

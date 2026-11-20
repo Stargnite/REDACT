@@ -18,7 +18,7 @@ export default function ScanPage() {
         that names the type and nothing else.
       </p>
 
-      <div className="mt-14">
+      <div className="mt-10 sm:mt-14">
         <ScanPanel />
       </div>
     </section>

@@ -66,6 +66,15 @@ that is spent, cloud calls answer `429 quota exceeded` until the daily reset. Tw
 - **Do not spend the quota on test paragraphs.** Every cloud scan counts against the same 20, so a
   long testing session is exactly what leaves you unable to demo the cloud tier.
 
+**A scan that hits the quota still returns findings, and that is the dangerous part.** The pattern
+tier runs first and never fails, so a quota error means the model tier contributed nothing while the
+page still shows a clean-looking result. The badge reads `PATTERNS ONLY` and the receipt shows
+`MODEL TIER · 0`, but a name, an employer, an address or a free-form secret would never have been
+caught. The scan panel now says this in words — `QUOTA EXCEEDED`, the findings come from the pattern
+rules alone, treat this as a partial scrub — and the raw SDK dump is behind a `Technical detail`
+disclosure instead of being dumped into the layout. If you see that notice in a demo, the number of
+findings on screen is not the number of secrets in the text.
+
 **First cloud smoke test, once the quota resets.** Do it with a trivial prompt before testing the
 scrubber, so a failure means the plumbing is broken rather than our code. The Firebase guide uses
 *Write a story about a magic backpack.* If that comes back with text, App Check and the genai

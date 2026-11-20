@@ -32,7 +32,7 @@ export function MaskedOutput({ text }: { text: string }) {
         </button>
       </div>
 
-      <pre className="mt-4 max-h-[28rem] overflow-auto whitespace-pre-wrap break-words border border-hairline bg-surface p-4 text-sm leading-relaxed text-text">
+      <pre className="mt-4 max-h-[22rem] overflow-auto whitespace-pre-wrap break-words border border-hairline bg-surface p-4 text-sm leading-relaxed text-text [overflow-wrap:anywhere] sm:max-h-[28rem]">
         {text}
       </pre>
     </div>
