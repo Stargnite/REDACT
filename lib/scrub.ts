@@ -1,7 +1,8 @@
-import { mergeFindings } from "./offsets";
+import { mergeFindings, resolveRetentions } from "./offsets";
 import { toFindings, type ModelRunner, type Tier } from "./model";
 import { findPatterns } from "./patterns";
-import type { ScanMode, ScanResult } from "./types";
+import { DEFAULT_CONTEXT } from "./purpose";
+import type { ScanContext, ScanMode, ScanResult } from "./types";
 
 /**
  * A rough token estimate. The real on-device window is reported by the
@@ -25,6 +26,8 @@ export interface ScrubOptions {
   mode?: ScanMode;
   /** Omit it and the scan runs the pattern tier only. */
   runner?: ModelRunner;
+  /** What the text is for, and how the clean copy should read. */
+  context?: ScanContext;
 }
 
 function chooseTier(text: string, mode: ScanMode): Tier {
@@ -45,6 +48,7 @@ export async function scrub(
   options: ScrubOptions = {}
 ): Promise<ScanResult> {
   const mode = options.mode ?? "auto";
+  const context = options.context ?? DEFAULT_CONTEXT;
   const startedAt = Date.now();
 
   const patternStartedAt = Date.now();
@@ -59,6 +63,8 @@ export async function scrub(
     charsSent: 0,
     patternCount: patternFindings.length,
     modelCount: 0,
+    retainedCount: 0,
+    context,
     durations: { patternsMs, modelMs: 0, totalMs: Date.now() - startedAt },
   };
 
@@ -69,14 +75,14 @@ export async function scrub(
   let tier = chooseTier(text, mode);
   const modelStartedAt = Date.now();
 
-  let run = await options.runner(text, tier);
+  let run = await options.runner(text, tier, context);
 
   // An on-device run that fails escalates to the cloud, but only when the
   // user asked for automatic behaviour. A deliberate "on device only" choice
   // is honoured even if it means returning no model findings.
   if (!run.ok && tier === "on_device" && mode === "auto") {
     tier = "cloud";
-    run = await options.runner(text, tier);
+    run = await options.runner(text, tier, context);
   }
 
   const modelMs = Date.now() - modelStartedAt;
@@ -89,8 +95,12 @@ export async function scrub(
     };
   }
 
-  const { findings: modelFindings } = toFindings(text, run.raw);
-  const findings = mergeFindings([...patternFindings, ...modelFindings]);
+  const { findings: modelFindings } = toFindings(text, run.raw, context);
+  const resolved = resolveRetentions([...patternFindings, ...modelFindings]);
+  const findings = mergeFindings(resolved);
+  const retainedCount = findings.filter(
+    (finding) => finding.decision === "retain"
+  ).length;
 
   // The badge and the character counter report where the scan actually ran,
   // not where it was aimed. In auto mode a run that ended up in the cloud
@@ -104,8 +114,10 @@ export async function scrub(
     escalated: mode === "auto" && ranInCloud,
     charCount: text.length,
     charsSent: run.charsSent,
-    patternCount: patternFindings.length,
-    modelCount: modelFindings.length,
+    patternCount: findings.filter((finding) => finding.source === "pattern").length,
+    modelCount: findings.filter((finding) => finding.source === "model").length,
+    retainedCount,
+    context,
     durations: { patternsMs, modelMs, totalMs: Date.now() - startedAt },
   };
 }

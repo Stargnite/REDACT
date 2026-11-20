@@ -1,3 +1,4 @@
+import { applyOutput } from "./rewrite";
 import type { Finding, Severity } from "./types";
 
 /**
@@ -226,21 +227,28 @@ function overlaps(a: Finding, b: Finding): boolean {
 }
 
 /**
+ * Applies retentions.
+ *
+ * A retention is the model saying "this span is needed for the purpose", and
+ * it cancels the pattern-tier finding for the same span. It never cancels
+ * another model finding: when the model contradicts itself about a span, the
+ * span is redacted, not kept.
+ */
+export function resolveRetentions(findings: Finding[]): Finding[] {
+  const retained = findings.filter((finding) => finding.decision === "retain");
+  if (retained.length === 0) return findings;
+
+  return findings.filter((finding) => {
+    if (finding.decision === "retain") return true;
+    if (finding.source !== "pattern") return true;
+    return !retained.some((keep) => overlaps(keep, finding));
+  });
+}
+
+/**
  * Replaces every finding span with a mask token. The token names the type so
  * the reader still knows what was removed: `[REDACTED:AWS_ACCESS_KEY]`.
  */
 export function maskText(text: string, findings: Finding[]): string {
-  const ordered = [...findings].sort((a, b) => a.start - b.start);
-  let out = "";
-  let cursor = 0;
-
-  for (const finding of ordered) {
-    if (finding.start < cursor) continue;
-    out += text.slice(cursor, finding.start);
-    out += `[REDACTED:${finding.type}]`;
-    cursor = finding.end;
-  }
-
-  out += text.slice(cursor);
-  return out;
+  return applyOutput(text, findings, "token");
 }

@@ -8,7 +8,8 @@ import {
 } from "firebase/ai";
 import { getFirebaseApp, isFirebaseConfigured, startAppCheck } from "./firebase";
 import type { ModelRun, ModelRunner, Tier } from "./model";
-import { SCHEMA_HINT, SYSTEM_INSTRUCTION } from "./prompt";
+import { schemaHint, systemInstruction } from "./prompt";
+import type { ScanContext } from "./types";
 
 const CLOUD_MODEL =
   process.env.NEXT_PUBLIC_FIREBASE_CLOUD_MODEL ?? "gemini-3.8-flash";
@@ -20,18 +21,24 @@ const CLOUD_MODEL =
  * created. So the on-device model and the cloud model are told the same
  * thing in two different places.
  */
-const ON_DEVICE_SYSTEM_PROMPT = `${SYSTEM_INSTRUCTION}
-
-${SCHEMA_HINT}`;
-
-const CLOUD_SYSTEM_PROMPT = `${SYSTEM_INSTRUCTION}
-
-${SCHEMA_HINT}`;
+function buildPrompt(context: ScanContext): string {
+  return `${systemInstruction(context)}` + "\n\n" + schemaHint(context);
+}
 
 let ai: AI | null = null;
-let onDeviceModel: GenerativeModel | null = null;
-let cloudModel: GenerativeModel | null = null;
-let deviceReady = false;
+const onDeviceModels = new Map<string, GenerativeModel>();
+const cloudModels = new Map<string, GenerativeModel>();
+const readyModels = new WeakSet<GenerativeModel>();
+
+/**
+ * The prompt is fixed when the on-device session is created, so a session
+ * belongs to one purpose and one output form. Keying the sessions by context
+ * means changing the purpose starts a new session instead of quietly sending
+ * the instruction from the last one.
+ */
+function contextKey(context: ScanContext): string {
+  return [context.purpose, context.outputForm, context.purposeNote ?? ""].join("|");
+}
 
 function getAi(): AI {
   if (!ai) {
@@ -41,11 +48,14 @@ function getAi(): AI {
   return ai;
 }
 
-function getOnDeviceModel(): GenerativeModel {
-  if (!onDeviceModel) {
-    onDeviceModel = getGenerativeModel(getAi(), {
-      mode: InferenceMode.ONLY_ON_DEVICE,
-      inCloudParams: { model: CLOUD_MODEL, systemInstruction: CLOUD_SYSTEM_PROMPT },
+function getOnDeviceModel(context: ScanContext): GenerativeModel {
+  const cached = onDeviceModels.get(contextKey(context));
+  if (cached) return cached;
+
+  const prompt = buildPrompt(context);
+  const model = getGenerativeModel(getAi(), {
+    mode: InferenceMode.ONLY_ON_DEVICE,
+    inCloudParams: { model: CLOUD_MODEL, systemInstruction: prompt },
       onDeviceParams: {
         createOptions: {
           expectedInputs: [{ type: "text", languages: ["en"] }],
@@ -53,24 +63,31 @@ function getOnDeviceModel(): GenerativeModel {
           initialPrompts: [
             {
               role: "system",
-              content: [{ type: "text", value: ON_DEVICE_SYSTEM_PROMPT }],
+              content: [{ type: "text", value: prompt }],
             },
           ],
         },
       },
-    });
-  }
-  return onDeviceModel;
+  });
+
+  onDeviceModels.set(contextKey(context), model);
+  return model;
 }
 
-function getCloudModel(): GenerativeModel {
-  if (!cloudModel) {
-    cloudModel = getGenerativeModel(getAi(), {
-      mode: InferenceMode.ONLY_IN_CLOUD,
-      inCloudParams: { model: CLOUD_MODEL, systemInstruction: CLOUD_SYSTEM_PROMPT },
-    });
-  }
-  return cloudModel;
+function getCloudModel(context: ScanContext): GenerativeModel {
+  const cached = cloudModels.get(contextKey(context));
+  if (cached) return cached;
+
+  const model = getGenerativeModel(getAi(), {
+    mode: InferenceMode.ONLY_IN_CLOUD,
+    inCloudParams: {
+      model: CLOUD_MODEL,
+      systemInstruction: buildPrompt(context),
+    },
+  });
+
+  cloudModels.set(contextKey(context), model);
+  return model;
 }
 
 /**
@@ -79,8 +96,8 @@ function getCloudModel(): GenerativeModel {
  * scan does not race a download that is still in flight.
  */
 async function ensureDeviceReady(model: GenerativeModel): Promise<void> {
-  if (deviceReady) return;
-  deviceReady = true;
+  if (readyModels.has(model)) return;
+  readyModels.add(model);
   await model.initializeDeviceModel();
 }
 
@@ -89,8 +106,11 @@ function describeError(error: unknown): string {
   return "The model tier could not run.";
 }
 
-async function runOnDevice(text: string): Promise<ModelRun> {
-  const model = getOnDeviceModel();
+async function runOnDevice(
+  text: string,
+  context: ScanContext
+): Promise<ModelRun> {
+  const model = getOnDeviceModel(context);
   await ensureDeviceReady(model);
 
   const result = await model.generateContent({
@@ -109,8 +129,11 @@ async function runOnDevice(text: string): Promise<ModelRun> {
   };
 }
 
-async function runInCloud(text: string): Promise<ModelRun> {
-  const model = getCloudModel();
+async function runInCloud(
+  text: string,
+  context: ScanContext
+): Promise<ModelRun> {
+  const model = getCloudModel(context);
 
   const result = await model.generateContent({
     contents: [{ role: "user", parts: [{ text, type: "text" }] }],
@@ -137,9 +160,15 @@ async function runInCloud(text: string): Promise<ModelRun> {
 export function createModelRunner(): ModelRunner | null {
   if (!isFirebaseConfigured()) return null;
 
-  return async (text: string, tier: Tier): Promise<ModelRun> => {
+  return async (
+    text: string,
+    tier: Tier,
+    context: ScanContext
+  ): Promise<ModelRun> => {
     try {
-      return tier === "on_device" ? await runOnDevice(text) : await runInCloud(text);
+      return tier === "on_device"
+        ? await runOnDevice(text, context)
+        : await runInCloud(text, context);
     } catch (error) {
       return {
         ok: false,
