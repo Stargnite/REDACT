@@ -89,7 +89,9 @@ What you did, for the record:
 1. Open **https://console.cloud.google.com/fraud-defense/keys?project=redact-fdd1a**
 2. **Create key** → key type **Website** → **Score based (v3)**. This is the only kind the Fraud
    Defense console issues now; there is no classic key left to create.
-3. **Authorized domains**: `redact-fdd1a.web.app`
+3. **Authorized domains**: `redact-fdd1a.web.app`. This is the only domain list that matters, and it
+   lives on the reCAPTCHA key in Google Cloud, not in Firebase. To change it later: Fraud Defense →
+   Keys → the key → **Edit** → **Domain list**.
 4. Accept the terms and create. You get a **site key** and a **secret key**.
 
 > **Do NOT add `localhost` to the authorized domains list.** The AI Logic setup guide warns that
