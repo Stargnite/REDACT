@@ -40,6 +40,11 @@ The setup flow auto-enables **App Check for AI Logic**. Afterwards, confirm unde
 **Security → App Check → APIs** that AI Logic reads **Enforced**. If it reads **Unenforced**,
 enforce it before going on.
 
+The wizard's last step asks about **replay protection**. Answer **Disabled**. Enforced mode
+requires the client to request limited-use App Check tokens, which our web SDK does not do, so
+enforcing it would block every cloud request. Disabled has no performance or cost impact, which
+is what a demo needs.
+
 **Why you:** the genai config is written by the console workflow only — there is no public API for
 it (I probed the AI Logic and Firebase Management discovery docs; the resource does not exist
 outside the console).
