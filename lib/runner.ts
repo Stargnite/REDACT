@@ -11,7 +11,7 @@ import type { ModelRun, ModelRunner, Tier } from "./model";
 import { SCHEMA_HINT, SYSTEM_INSTRUCTION } from "./prompt";
 
 const CLOUD_MODEL =
-  process.env.NEXT_PUBLIC_FIREBASE_CLOUD_MODEL ?? "gemini-2.5-flash";
+  process.env.NEXT_PUBLIC_FIREBASE_CLOUD_MODEL ?? "gemini-3.8-flash";
 
 /**
  * The on-device path in the Firebase AI SDK does not read the system
