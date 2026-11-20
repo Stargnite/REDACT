@@ -1,12 +1,19 @@
 "use client";
 
 import { useState } from "react";
+import type { OutputForm } from "@/lib/types";
 
 /**
  * The clean copy. This is the text the user pastes into their assistant,
  * so it gets its own panel and its own copy button.
  */
-export function MaskedOutput({ text }: { text: string }) {
+export function MaskedOutput({
+  text,
+  form,
+}: {
+  text: string;
+  form: OutputForm;
+}) {
   const [copied, setCopied] = useState(false);
 
   async function copy() {
@@ -22,7 +29,9 @@ export function MaskedOutput({ text }: { text: string }) {
   return (
     <div>
       <div className="flex items-baseline justify-between gap-4">
-        <h2 className="mono text-faint">CLEAN COPY</h2>
+        <h2 className="mono text-faint">
+          CLEAN COPY · {form === "rewritten" ? "REWRITTEN" : "TOKENS"}
+        </h2>
         <button
           type="button"
           onClick={copy}

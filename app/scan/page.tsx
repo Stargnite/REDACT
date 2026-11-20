@@ -13,9 +13,11 @@ export default function ScanPage() {
       <h1 className="text-display text-text">Scan</h1>
 
       <p className="measure mt-6 text-muted">
-        Paste the text you are about to send to an assistant. REDACT finds the
-        sensitive spans and hands back a copy with each one replaced by a token
-        that names the type and nothing else.
+        Paste the text you are about to send to an assistant. Say where it is
+        going, and REDACT finds the spans that are sensitive for that
+        destination, then hands back a copy with each one replaced by a token
+        that names the type or by a generic phrase that keeps the sentence
+        readable.
       </p>
 
       <div className="mt-10 sm:mt-14">

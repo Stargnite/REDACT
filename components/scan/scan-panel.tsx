@@ -3,11 +3,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { explainModelError } from "@/lib/errors";
-import { maskText } from "@/lib/offsets";
 import { createModelRunner } from "@/lib/runner";
 import { scrub } from "@/lib/scrub";
-import type { ScanMode, ScanResult } from "@/lib/types";
+import { applyOutput } from "@/lib/rewrite";
+import type {
+  OutputForm,
+  Purpose,
+  ScanContext,
+  ScanMode,
+  ScanResult,
+} from "@/lib/types";
 import { EscalationNotice } from "./escalation-notice";
+import { OutputFormToggle, PurposePicker } from "./context-controls";
 import { FindingRow } from "./finding-row";
 import { InferenceBadge } from "./inference-badge";
 import { MaskedOutput } from "./masked-output";
@@ -19,16 +26,43 @@ import { ReceiptPanel } from "./receipt-panel";
 export function ScanPanel() {
   const [text, setText] = useState("");
   const [mode, setMode] = useState<ScanMode>("auto");
+  const [purpose, setPurpose] = useState<Purpose>("general");
+  const [purposeNote, setPurposeNote] = useState("");
+  const [outputForm, setOutputForm] = useState<OutputForm>("rewritten");
   const [result, setResult] = useState<ScanResult | null>(null);
   const [busy, setBusy] = useState(false);
 
   const runner = useMemo(() => createModelRunner(), []);
   const resultsRef = useRef<HTMLElement | null>(null);
 
+  const context = useMemo<ScanContext>(
+    () => ({
+      purpose,
+      purposeNote: purpose === "custom" ? purposeNote : undefined,
+      outputForm,
+    }),
+    [purpose, purposeNote, outputForm]
+  );
+
+  // The clean copy is written from the context the scan actually ran under,
+  // not from the context on screen now, so the panel can never show a copy
+  // the model never produced.
   const masked = useMemo(
-    () => (result ? maskText(text, result.findings) : ""),
+    () =>
+      result ? applyOutput(text, result.findings, result.context.outputForm) : "",
     [result, text]
   );
+
+  // Changing the purpose or the output form after a scan makes the result
+  // stale. Say so rather than quietly showing the old answer.
+  const stale = useMemo(() => {
+    if (!result) return false;
+    return (
+      result.context.purpose !== context.purpose ||
+      result.context.outputForm !== context.outputForm ||
+      (result.context.purposeNote ?? "") !== (context.purposeNote ?? "")
+    );
+  }, [result, context]);
 
   const modelError = useMemo(
     () =>
@@ -53,7 +87,9 @@ export function ScanPanel() {
   async function run() {
     setBusy(true);
     try {
-      setResult(await scrub(text, { mode, runner: runner ?? undefined }));
+      setResult(
+        await scrub(text, { mode, runner: runner ?? undefined, context })
+      );
     } finally {
       setBusy(false);
     }
@@ -62,7 +98,18 @@ export function ScanPanel() {
   return (
     <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-16">
       <div className="min-w-0">
-        <label htmlFor="source" className="mono block text-faint">
+        <PurposePicker
+          purpose={purpose}
+          onChange={setPurpose}
+          note={purposeNote}
+          onNoteChange={setPurposeNote}
+        />
+
+        <div className="mt-8">
+          <OutputFormToggle value={outputForm} onChange={setOutputForm} />
+        </div>
+
+        <label htmlFor="source" className="mono mt-8 block text-faint">
           TEXT TO SCRUB
         </label>
         <Textarea
@@ -121,10 +168,22 @@ export function ScanPanel() {
               </div>
             ) : null}
 
+            {stale ? (
+              <p className="mono mt-6 text-accent">
+                CONTEXT CHANGED · SCAN AGAIN TO APPLY IT
+              </p>
+            ) : null}
+
             <h2 className="mono mt-8 text-faint sm:mt-10">
               {result.findings.length} FINDING
               {result.findings.length === 1 ? "" : "S"}
             </h2>
+
+            {result.retainedCount > 0 ? (
+              <p className="mono mt-2 text-faint">
+                {result.retainedCount} KEPT · THIS PURPOSE NEEDS IT
+              </p>
+            ) : null}
 
             {result.findings.length > 0 ? (
               <ul className="mt-3">
@@ -140,7 +199,7 @@ export function ScanPanel() {
             )}
 
             <div className="mt-8 sm:mt-12">
-              <MaskedOutput text={masked} />
+              <MaskedOutput text={masked} form={result.context.outputForm} />
             </div>
           </section>
         ) : null}
