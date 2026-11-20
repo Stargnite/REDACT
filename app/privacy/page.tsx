@@ -29,6 +29,11 @@ const FACTS = [
     title: "The counter is the receipt",
     body: "Every scan ends with a line telling you how many characters went in and how many went out. On device it reads zero sent. In the cloud it reads the exact number. Nothing is left for you to infer.",
   },
+  {
+    index: "05",
+    title: "The leak test only sends the copy",
+    body: "The probe that checks a clean copy for leaks is given the copy and the kinds of thing that were removed. It never gets the original, so even when the probe runs in the cloud, the only text that leaves the machine is text you were about to send anyway.",
+  },
 ];
 
 export default function PrivacyPage() {

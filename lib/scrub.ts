@@ -30,7 +30,7 @@ export interface ScrubOptions {
   context?: ScanContext;
 }
 
-function chooseTier(text: string, mode: ScanMode): Tier {
+export function chooseTier(text: string, mode: ScanMode): Tier {
   if (mode === "cloud") return "cloud";
   if (mode === "on_device") return "on_device";
   return estimateTokens(text) > ON_DEVICE_TOKEN_BUDGET ? "cloud" : "on_device";

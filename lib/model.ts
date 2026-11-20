@@ -35,6 +35,20 @@ export type ModelRunner = (
   context: ScanContext
 ) => Promise<ModelRun>;
 
+/**
+ * The leak probe.
+ *
+ * It is given the clean copy and the kinds of thing that were removed, and
+ * nothing else. It never receives the original, so it cannot quote a secret
+ * and the report cannot become the leak.
+ */
+export type LeakRunner = (
+  cleanCopy: string,
+  removedTypes: string[],
+  tier: Tier
+) => Promise<ModelRun>;
+
+
 const QUOTE_KEYS = ["quote", "text", "value", "snippet", "match", "span"];
 const TYPE_KEYS = ["type", "label", "category", "kind", "class"];
 const DECISION_KEYS = ["decision", "action", "action_type", "verdict"];
