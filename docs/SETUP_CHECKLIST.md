@@ -71,12 +71,18 @@ scrubber, so a failure means the plumbing is broken rather than our code. The Fi
 *Write a story about a magic backpack.* If that comes back with text, App Check and the genai
 config are both good and anything wrong afterwards is ours.
 
-### A4. App Check → reCAPTCHA v3 — this one needs two consoles
+### A4. App Check → reCAPTCHA — **done and verified**
 
-**This is the step that makes the deployed demo work.** The debug token in `.env.local` is a local
-development shortcut and it is never committed, so a judge opening `redact-fdd1a.web.app` gets no
-App Check token and the cloud tier fails. The reCAPTCHA provider is what fixes that, and it takes
-two console visits.
+**Status, 20 Nov 2026: done and verified end to end.** The key is registered, App Check is
+enforced, and the deployed site passes App Check. The proof:
+
+- A model request with **no** App Check token is rejected with `401 Firebase App Check token is
+  invalid` — so enforcement is genuinely on for AI Logic.
+- The **deployed** site at `https://redact-fdd1a.web.app/scan/` reaches the model endpoint and
+  gets a quota error, not an App Check error. The only way to get that far is a valid App Check
+  token, which means the reCAPTCHA Enterprise provider ran in a real browser and was accepted.
+
+What you did, for the record:
 
 **Part 1 — create the key (Google Cloud console, not Firebase):**
 
@@ -121,6 +127,21 @@ that token and never calls the reCAPTCHA provider, so the site key can stay empt
 ready to deploy.
 
 **Why you:** the keypair is only ever shown on your screen, and I cannot read it.
+
+### A4b. The site is live
+
+**Deployed, 20 Nov 2026.** `https://redact-fdd1a.web.app` serves the static export. All four
+routes return 200: `/`, `/scan/`, `/how-it-works/`, `/privacy/`.
+
+To redeploy after a change:
+
+```bash
+npm run build
+firebase deploy --only hosting --project redact-fdd1a
+```
+
+The hosting config is `firebase.json` in the repo. `NEXT_PUBLIC_` values are baked in at build
+time, so the reCAPTCHA site key has to be in `.env.local` **before** the build, not after.
 
 ### A5. App Check debug token — **done**
 
@@ -261,9 +282,8 @@ Firebase Hosting gives `https://redact-fdd1a.web.app` free on Spark. If you want
 | When | What | Why |
 |---|---|---|
 | Today | Run the AI Logic setup workflow (A3) | Enables the APIs and App Check for AI Logic |
-| Today | Create the reCAPTCHA v3 key and register the app (A4) | The deployed demo has no debug token to fall back on |
-| Today | Paste the reCAPTCHA **site key** (not the secret key) | Only shown on your screen |
 | Today | Enable the Anonymous auth provider | Console-only |
+| Today | Open the deployed site in **your** Chrome and check the on-device tier | The only way to see Gemini Nano present |
 | This week | `brew install gh` + `gh auth login` | Optional - only to manage PRs from the CLI |
 | This week | `brew install ffmpeg` | Demo video |
 | Before submission | Record + upload the video, fill in Devpost | Submission requirement |
