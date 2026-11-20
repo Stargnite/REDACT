@@ -46,10 +46,17 @@ permanent and globally unique, so tell me now if you would rather choose it your
 Console only. This is the free-tier path. The *Agent Platform / Vertex AI* option is the paid one
 and would force Blaze — do not pick it.
 
+**Status, 20 Nov 2026:** I have already enabled `firebasevertexai.googleapis.com` and
+`firebaseappcheck.googleapis.com` on the project from the CLI. A direct call now returns
+`Firebase AI Logic genai config not found`, which means the remaining work is exactly one console
+click: the **Get started** workflow, which writes the per-app genai config and enforces App Check.
+
 The setup flow auto-enables **App Check for AI Logic**. Afterwards, confirm under
 **Security → App Check → APIs** that AI Logic reads **Enforced**.
 
-**Why you:** the API enablement is tied to your Google account's AI Studio consent flow.
+**Why you:** the genai config is written by the console workflow only — there is no public API for
+it (I probed the AI Logic and Firebase Management discovery docs; the resource does not exist
+outside the console).
 
 ### A4. App Check → reCAPTCHA v3 — register a keypair
 
