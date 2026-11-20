@@ -81,7 +81,8 @@ two console visits.
 **Part 1 — create the key (Google Cloud console, not Firebase):**
 
 1. Open **https://console.cloud.google.com/fraud-defense/keys?project=redact-fdd1a**
-2. **Create key** → key type **Website** → **reCAPTCHA v3**.
+2. **Create key** → key type **Website** → **Score based (v3)**. This is the only kind the Fraud
+   Defense console issues now; there is no classic key left to create.
 3. **Authorized domains**: `redact-fdd1a.web.app`
 4. Accept the terms and create. You get a **site key** and a **secret key**.
 
@@ -93,13 +94,23 @@ two console visits.
 
 1. Firebase console → **Security → App Check → Apps tab → Register app** (not the Build button).
 2. Choose the **web app** — the one already registered as *Redact*.
-3. Provider: **reCAPTCHA v3**.
-4. Paste the **secret key** here. This is the only place it ever goes.
+3. Provider: **reCAPTCHA Enterprise**.
+4. Paste the **site key**. The Enterprise provider takes the site key, not the secret key.
 5. Save, then turn **Enforcement** on.
 
-**Part 3 — give the site key to the app.** Put the **site key** in `.env.local` as
-`NEXT_PUBLIC_RECAPTCHA_SITE_KEY` and rebuild before deploying, because `NEXT_PUBLIC_` values are
-inlined at build time.
+> **The secret key is not needed and is never committed.** The classic *reCAPTCHA v3* provider
+> wants a secret key, but Google no longer issues classic keys — the Fraud Defense console only
+> creates score-based Enterprise keys, and Firebase has a provider for those that takes the site
+> key instead. If you want to see the secret key anyway, it is behind **Integration → "Use legacy
+> key"**. Nothing in this project uses it.
+
+**Part 3 — give the site key to the app.** The **site key** is in `.env.local` as
+`NEXT_PUBLIC_RECAPTCHA_SITE_KEY`, and the app uses `ReCaptchaEnterpriseProvider` to match the key
+type. `NEXT_PUBLIC_` values are inlined at build time, so rebuild before deploying.
+
+**Spark project, score threshold.** A Spark project only offers the score levels 0.1, 0.3, 0.7
+and 0.9, so pick **0.3** in the App Check settings. A higher threshold rejects legitimate browsers
+and would break the demo for a judge on a first visit.
 
 **If the App Check page has no Register app button, do A3 first.** The AI Logic setup workflow is
 what enables the APIs *and* turns on App Check for AI Logic, and until it has been run once there

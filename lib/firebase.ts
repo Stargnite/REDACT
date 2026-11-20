@@ -1,5 +1,5 @@
 import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
-import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
 
 /**
  * The Firebase web config. These are not secrets: a browser app cannot hold a
@@ -31,7 +31,8 @@ export function getFirebaseApp(): FirebaseApp {
 /**
  * App Check is enforced for AI Logic, so it has to be running before the first
  * model call. The debug token lets a local build pass App Check without a
- * registered reCAPTCHA v3 host; it is ignored once the real host is allowed.
+ * registered reCAPTCHA Enterprise host; it is ignored once the real host is
+ * allowed.
  */
 export function startAppCheck(): void {
   if (appCheckStarted) return;
@@ -48,7 +49,7 @@ export function startAppCheck(): void {
   if (!process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY && !debugToken) return;
 
   initializeAppCheck(getFirebaseApp(), {
-    provider: new ReCaptchaV3Provider(siteKey),
+    provider: new ReCaptchaEnterpriseProvider(siteKey),
     isTokenAutoRefreshEnabled: true,
   });
 
