@@ -57,6 +57,16 @@ describe("the pattern tier", () => {
     expect(invalid.some((f) => f.type === "CREDIT_CARD")).toBe(false);
   });
 
+  it("calls a string an IBAN only when the country code and mod-97 agree", () => {
+    const valid = findPatterns("pay to GB82WEST12345698765432 today");
+    expect(valid.some((f) => f.type === "IBAN")).toBe(true);
+
+    const apiKey = "sk-proj-WV2496E2BQ1M3EKVPBP75C-ENVP6G6WDJ4B43XFZ";
+    const invalid = findPatterns("key " + apiKey + " here");
+    expect(invalid.some((f) => f.type === "IBAN")).toBe(false);
+    expect(invalid.some((f) => f.type === "OPENAI_API_KEY")).toBe(true);
+  });
+
   it("marks a credential as critical and an email as high", () => {
     const findings = findPatterns("AKIAIOSFODNN7EXAMPLE ada@example.com");
     const key = findings.find((f) => f.type === "AWS_ACCESS_KEY");

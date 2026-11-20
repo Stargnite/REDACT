@@ -21,6 +21,21 @@ export interface Rule {
 }
 
 /**
+ * The countries that issue IBANs. Without this list, a long API key that
+ * happens to start with two uppercase letters and two digits reads exactly
+ * like an IBAN, and the pattern tier starts flagging keys.
+ */
+const IBAN_COUNTRY_CODES = [
+  "AD", "AE", "AL", "AT", "AZ", "BA", "BE", "BG", "BH", "BR", "BY", "CH",
+  "CR", "CY", "CZ", "DE", "DK", "DO", "EE", "EG", "ES", "FI", "FO", "FR",
+  "GB", "GE", "GI", "GL", "GR", "GT", "HR", "HU", "IE", "IL", "IQ", "IS",
+  "IT", "JO", "KW", "KZ", "LB", "LC", "LI", "LT", "LU", "LV", "LY", "MC",
+  "MD", "ME", "MK", "MR", "MT", "MU", "NL", "NO", "PK", "PL", "PS", "PT",
+  "QA", "RO", "RS", "SA", "SC", "SE", "SI", "SK", "SM", "ST", "SV", "TL",
+  "TN", "TR", "UA", "VA", "VG", "XK", "YE",
+];
+
+/**
  * The deterministic tier. Patterns run first, in microseconds, with no model
  * and no network. They are the floor of the product: even if the model tier
  * is unavailable, a live AWS key still gets caught.
@@ -95,7 +110,7 @@ export const RULES: Rule[] = [
     label: "OPENAI API KEY",
     severity: "critical",
     pattern: new RegExp(
-      "(?<![0-9A-Za-z_])sk-(?:proj-)?[0-9A-Za-z_-]{32,}(?![0-9A-Za-z])",
+      "(?<![0-9A-Za-z_])sk-(?!(?:ant-))(?:proj-)?[0-9A-Za-z_-]{32,}(?![0-9A-Za-z])",
       "g"
     ),
   },
@@ -204,9 +219,12 @@ export const RULES: Rule[] = [
     label: "IBAN",
     severity: "high",
     pattern: new RegExp(
-      "(?<![0-9A-Za-z])[A-Z]{2}[0-9]{2}[0-9A-Z]{10,30}(?![0-9A-Za-z])",
+      "(?<![0-9A-Za-z])(?:" +
+        IBAN_COUNTRY_CODES.join("|") +
+        ")[0-9]{2}[0-9A-Z]{10,30}(?![0-9A-Za-z])",
       "g"
     ),
+    validate: passesIban,
   },
 
   // -------------------------------------------------------------------- low
@@ -251,4 +269,29 @@ export function passesLuhn(raw: string): boolean {
     double = !double;
   }
   return sum % 10 === 0;
+}
+
+/**
+ * The ISO 13616 check: a country code that issues IBANs, a plausible length,
+ * and a mod-97 remainder of one. The country code is part of the test, not
+ * just the pattern, because a random API key passes the checksum about one
+ * time in ninety seven.
+ */
+export function passesIban(raw: string): boolean {
+  const iban = raw.replace(/[^0-9A-Z]/g, "");
+  if (iban.length < 15 || iban.length > 34) return false;
+  if (!IBAN_COUNTRY_CODES.includes(iban.slice(0, 2))) return false;
+
+  const rearranged = iban.slice(4) + iban.slice(0, 4);
+  let remainder = 0;
+  for (const character of rearranged) {
+    const value =
+      character >= "A" && character <= "Z"
+        ? character.charCodeAt(0) - 55
+        : character.charCodeAt(0) - 48;
+    for (const digit of String(value)) {
+      remainder = (remainder * 10 + Number(digit)) % 97;
+    }
+  }
+  return remainder === 1;
 }
