@@ -4,11 +4,21 @@ import {
   GoogleAIBackend,
   InferenceMode,
   type AI,
+  type Content,
   type GenerativeModel,
 } from "firebase/ai";
 import { getFirebaseApp, isFirebaseConfigured, startAppCheck } from "./firebase";
+import { imagePrompt, imageUserMessage } from "./image-prompt";
 import { leakPrompt, leakUserMessage } from "./leak-prompt";
-import type { LeakRunner, ModelRun, ModelRunner, Tier } from "./model";
+import type {
+  ImageInput,
+  ImageRun,
+  ImageRunner,
+  LeakRunner,
+  ModelRun,
+  ModelRunner,
+  Tier,
+} from "./model";
 import { schemaHint, systemInstruction } from "./prompt";
 import type { ScanContext } from "./types";
 
@@ -287,6 +297,146 @@ export function createLeakRunner(): LeakRunner | null {
         tier,
         source: tier === "cloud" ? "in_cloud" : "on_device",
         charsSent: 0,
+        error: describeError(error),
+      };
+    }
+  };
+}
+
+let imageOnDeviceModel: GenerativeModel | null = null;
+let imageCloudModel: GenerativeModel | null = null;
+
+/**
+ * The picture model has its own sessions, because the on-device session for a
+ * picture has to be opened expecting an image as well as text. A session
+ * opened for text alone cannot be handed a picture later.
+ *
+ * The instruction never changes, so there is one session for pictures and no
+ * need to key anything by purpose.
+ */
+function getImageOnDeviceModel(): GenerativeModel {
+  if (imageOnDeviceModel) return imageOnDeviceModel;
+
+  const prompt = imagePrompt();
+
+  imageOnDeviceModel = getGenerativeModel(getAi(), {
+    mode: InferenceMode.ONLY_ON_DEVICE,
+    inCloudParams: { model: CLOUD_MODEL, systemInstruction: prompt },
+    onDeviceParams: {
+      createOptions: {
+        expectedInputs: [
+          { type: "text", languages: ["en"] },
+          { type: "image" },
+        ],
+        expectedOutputs: [{ type: "text", languages: ["en"] }],
+        initialPrompts: [
+          {
+            role: "system",
+            content: [{ type: "text", value: prompt }],
+          },
+        ],
+      },
+    },
+  });
+
+  return imageOnDeviceModel;
+}
+
+function getImageCloudModel(): GenerativeModel {
+  if (imageCloudModel) return imageCloudModel;
+
+  imageCloudModel = getGenerativeModel(getAi(), {
+    mode: InferenceMode.ONLY_IN_CLOUD,
+    inCloudParams: { model: CLOUD_MODEL, systemInstruction: imagePrompt() },
+  });
+
+  return imageCloudModel;
+}
+
+function imageContents(image: ImageInput, context: ScanContext): Content[] {
+  return [
+    {
+      role: "user",
+      parts: [
+        {
+          text: imageUserMessage(context, image.width, image.height),
+          type: "text",
+        },
+        {
+          type: "inlineData",
+          inlineData: { mimeType: image.mimeType, data: image.base64 },
+        },
+      ],
+    },
+  ];
+}
+
+async function runImageOnDevice(
+  image: ImageInput,
+  context: ScanContext
+): Promise<ImageRun> {
+  const model = getImageOnDeviceModel();
+  await ensureDeviceReady(model);
+
+  const result = await model.generateContent({
+    contents: imageContents(image, context),
+  });
+
+  const ranOnDevice = result.response.inferenceSource !== "in_cloud";
+
+  return {
+    ok: true,
+    raw: result.response.text(),
+    tier: "on_device",
+    source: ranOnDevice ? "on_device" : "in_cloud",
+    bytesSent: ranOnDevice ? 0 : image.bytes,
+  };
+}
+
+async function runImageInCloud(
+  image: ImageInput,
+  context: ScanContext
+): Promise<ImageRun> {
+  const model = getImageCloudModel();
+
+  const result = await model.generateContent({
+    contents: imageContents(image, context),
+  });
+
+  return {
+    ok: true,
+    raw: result.response.text(),
+    tier: "cloud",
+    source: "in_cloud",
+    bytesSent: image.bytes,
+  };
+}
+
+/**
+ * The runner the UI passes into the picture scrubber.
+ *
+ * Like the text runner, it never escalates by itself: the caller decides,
+ * because "never send this to a server" has to be a promise the app keeps.
+ */
+export function createImageRunner(): ImageRunner | null {
+  if (!isFirebaseConfigured()) return null;
+
+  return async (
+    image: ImageInput,
+    tier: Tier,
+    context: ScanContext
+  ): Promise<ImageRun> => {
+    try {
+      return tier === "on_device"
+        ? await runImageOnDevice(image, context)
+        : await runImageInCloud(image, context);
+    } catch (error) {
+      return {
+        ok: false,
+        raw: "",
+        tier,
+        source: tier === "cloud" ? "in_cloud" : "on_device",
+        bytesSent: 0,
         error: describeError(error),
       };
     }

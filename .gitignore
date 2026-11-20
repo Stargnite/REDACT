@@ -21,3 +21,6 @@ tsconfig.tsbuildinfo
 # The source portrait. The optimised copy the site serves is
 # public/images/tobi.jpg; this is only the original it was made from.
 public/images/portfolio-img.png
+
+# Local scratch files for testing.
+.scratch

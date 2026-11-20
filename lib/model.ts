@@ -48,6 +48,48 @@ export type LeakRunner = (
   tier: Tier
 ) => Promise<ModelRun>;
 
+/**
+ * A picture on its way to the model.
+ *
+ * The image is base64 without the data URL prefix, because that is the shape
+ * the inlineData part of a request takes.
+ */
+export interface ImageInput {
+  base64: string;
+  mimeType: string;
+  /** The width of the picture that was sent, in pixels. */
+  width: number;
+  height: number;
+  /** The size of the encoded picture, in bytes. */
+  bytes: number;
+}
+
+export interface ImageRun {
+  ok: boolean;
+  /** The raw text the model returned: its list of rectangles. */
+  raw: string;
+  /** The tier we asked for. */
+  tier: Tier;
+  /** Where the run actually happened. Not always the tier we asked for. */
+  source: "on_device" | "in_cloud";
+  /** Bytes of picture that actually left the device. Zero for every on-device run. */
+  bytesSent: number;
+  error?: string;
+}
+
+/**
+ * The model tier for pictures.
+ *
+ * It is separate from the text runner because a picture is a different
+ * request shape, and because a picture that goes to the cloud is a bigger
+ * thing to say out loud than a paragraph of text.
+ */
+export type ImageRunner = (
+  image: ImageInput,
+  tier: Tier,
+  context: ScanContext
+) => Promise<ImageRun>;
+
 
 const QUOTE_KEYS = ["quote", "text", "value", "snippet", "match", "span"];
 const TYPE_KEYS = ["type", "label", "category", "kind", "class"];

@@ -119,6 +119,30 @@ export default function HowItWorksPage() {
           </div>
         </Reveal>
       </section>
+
+      <section className="mx-auto mt-[clamp(7rem,14vw,12rem)] max-w-[var(--content-w)] px-[var(--gutter)]">
+        <SectionLabel index="04">Pictures</SectionLabel>
+        <Hairline className="mt-6" />
+
+        <Reveal>
+          <div className="measure-tight pt-7">
+            <p className="text-muted">
+              A screenshot carries more identifying detail than the text you
+              copy out of it, and none of it is text you can paste. So the
+              picture scrubber asks the model for rectangles instead of
+              sentences: where in the image is the name, the address, the key.
+            </p>
+            <p className="mt-6 text-muted">
+              The rectangles are checked before anything is drawn. One that
+              falls outside the image, or that has no area, is dropped, because
+              a black bar across the wrong part of a screenshot is worse than a
+              missed secret: you cannot tell a redaction from a mistake. The
+              picture that comes back is drawn in the browser, so it carries
+              none of the metadata the original had.
+            </p>
+          </div>
+        </Reveal>
+      </section>
     </>
   );
 }
