@@ -7,53 +7,38 @@ open for you.** Nothing here involves writing application code — the code live
 Deadline: **Mon 30 Nov 2026, 2:00 PM PT.** Today is Fri 20 Nov 2026. That is 10 days, and the
 items below are ordered by what blocks the most downstream work.
 
-**Interval 1 (20 Nov 2026) is committed and pushed.** The app builds, the pattern tier
-runs in the browser, and 23 unit tests cover the scan pipeline. Everything below is
-what the Firebase project needs before the model tier can run.
+**Interval 1 (20 Nov 2026) is committed and pushed.** The app builds, the pattern tier runs in the
+browser, and 26 unit tests cover the scan pipeline and the rule set. Everything below is what the
+Firebase project still needs before the model tier can run for anyone but you.
 
 ---
 
 ## A. Blocking the build (do these first, today)
 
-### A1. `firebase login` — one browser OAuth click
-The CLI is installed (`firebase-tools@15.37.0`) but not authenticated. Everything in §B waits on
-this.
+### A1. `firebase login` — **done**
 
-```bash
-firebase login
-```
+**Done, 20 Nov 2026.** Signed in as `tobyolamide22@gmail.com`, confirmed with
+`firebase login:list`. Every step below needs it, and every step below has used it.
 
-Open the URL it prints, sign in with the Google account you want the project under, approve.
-Verify with:
+### A2. The Firebase project — **done**
 
-```bash
-firebase login:list
-```
-
-**Why you:** it is a browser OAuth grant on your Google account. I cannot complete it for you.
-
-### A2. Create the Firebase project (I can run this the moment you are logged in)
-Spark plan, no card. I run:
-
-```bash
-firebase projects:create redact-local --display-name "REDACT"
-```
-
-**Why you:** only if you want a different project ID than `redact-local` — project IDs are
-permanent and globally unique, so tell me now if you would rather choose it yourself.
+**Done.** Project id `redact-fdd1a`, project number `95167246245`, display name *Redact*, web app
+id `1:95167246245:web:27667255f7f8ae5c55424c`. Spark plan, no card.
 
 ### A3. AI Services → AI Logic → Get started → **Gemini Developer API**
+
 Console only. This is the free-tier path. The *Agent Platform / Vertex AI* option is the paid one
 and would force Blaze — do not pick it.
 
 **Status, 20 Nov 2026:** I have already enabled `firebasevertexai.googleapis.com` and
 `firebaseappcheck.googleapis.com` on the project from the CLI. A direct call used to return
 `Firebase AI Logic genai config not found`; it now returns `429 quota exceeded`, because the
-free tier has been spent by the probe runs. The quota wall is hiding the config check, so the
+free tier has been spent by the probe runs. The quota wall is checked before the config, so the
 console step below is still unconfirmed and still the one thing left to do.
 
 The setup flow auto-enables **App Check for AI Logic**. Afterwards, confirm under
-**Security → App Check → APIs** that AI Logic reads **Enforced**.
+**Security → App Check → APIs** that AI Logic reads **Enforced**. If it reads **Unenforced**,
+enforce it before going on.
 
 **Why you:** the genai config is written by the console workflow only — there is no public API for
 it (I probed the AI Logic and Firebase Management discovery docs; the resource does not exist
@@ -63,64 +48,85 @@ outside the console).
 
 The cloud tier runs `gemini-3.8-flash` (`NEXT_PUBLIC_FIREBASE_CLOUD_MODEL` in `.env.local`).
 `gemini-2.5-flash` is closed to new projects and answers with a 404 that tells you to move to
-`gemini-3.8-flash`.
+`gemini-3.8-flash`. The Firebase guide's own example uses `gemini-4-hydrogen`; that name does not
+404 either, so keep it as the fallback if `gemini-3.8-flash` stays congested. I have not switched
+to it, because I cannot get a 200 out of either one today.
 
-The free tier is rate limited. Once the daily quota is spent, cloud calls answer
-`429 quota exceeded` for the rest of the day. Two consequences:
+The free tier is rate limited and the limit is small: the 429 names the metric
+`generativelanguage.googleapis.com/generate_content_free_tier_requests` with **20 requests**. Once
+that is spent, cloud calls answer `429 quota exceeded` until the daily reset. Two consequences:
 
 - **Record the demo on the on-device tier.** It is the product's claim and it does not spend a
   quota.
-- **Do not spend the quota on test paragraphs.** Every cloud scan counts against the same daily
-  allowance, so a long testing session is what leaves you unable to demo the cloud tier.
+- **Do not spend the quota on test paragraphs.** Every cloud scan counts against the same 20, so a
+  long testing session is exactly what leaves you unable to demo the cloud tier.
 
-### A4. App Check → reCAPTCHA v3 — register a keypair
-**Console path: Security → App Check → Apps tab → Register app.** (Not "Build".)
+**First cloud smoke test, once the quota resets.** Do it with a trivial prompt before testing the
+scrubber, so a failure means the plumbing is broken rather than our code. The Firebase guide uses
+*Write a story about a magic backpack.* If that comes back with text, App Check and the genai
+config are both good and anything wrong afterwards is ours.
 
-**If the App Check page is missing, or has no "Register app" button, do A3 first.** The AI Logic
-setup workflow is what enables the APIs *and* turns on App Check for AI Logic. Until it has been
-run once, there is nothing for App Check to register against.
+### A4. App Check → reCAPTCHA v3 — this one needs two consoles
 
-One field to copy:
-- **Site key** → goes in `.env.local` as `NEXT_PUBLIC_RECAPTCHA_SITE_KEY`
+**This is the step that makes the deployed demo work.** The debug token in `.env.local` is a local
+development shortcut and it is never committed, so a judge opening `redact-fdd1a.web.app` gets no
+App Check token and the cloud tier fails. The reCAPTCHA provider is what fixes that, and it takes
+two console visits.
 
-**The secret key goes in the Firebase console, not in your code.** It is only used to sign tokens
-server-side and REDACT has no server, so you never paste it into `.env.local` and it never enters
-the repo.
+**Part 1 — create the key (Google Cloud console, not Firebase):**
 
-Register **two** domains in the App Check allowed-domains list: `localhost` and
-`redact-fdd1a.web.app`.
+1. Open **https://console.cloud.google.com/fraud-defense/keys?project=redact-fdd1a**
+2. **Create key** → key type **Website** → **reCAPTCHA v3**.
+3. **Authorized domains**: `redact-fdd1a.web.app`
+4. Accept the terms and create. You get a **site key** and a **secret key**.
 
-> **Do NOT add `localhost` to the reCAPTCHA *allowed domains* list.** The Firebase docs are
-> explicit that the App Check allowed-domains list and the reCAPTCHA allowed-domains list are
-> different things, and adding localhost to the latter breaks local dev.
+> **Do NOT add `localhost` to the authorized domains list.** The AI Logic setup guide warns that
+> listing localhost lets anyone run the app locally against your quota. Local development does not
+> need it: with the debug token the reCAPTCHA provider is never called at all.
+
+**Part 2 — register the app with Firebase:**
+
+1. Firebase console → **Security → App Check → Apps tab → Register app** (not the Build button).
+2. Choose the **web app** — the one already registered as *Redact*.
+3. Provider: **reCAPTCHA v3**.
+4. Paste the **secret key** here. This is the only place it ever goes.
+5. Save, then turn **Enforcement** on.
+
+**Part 3 — give the site key to the app.** Put the **site key** in `.env.local` as
+`NEXT_PUBLIC_RECAPTCHA_SITE_KEY` and rebuild before deploying, because `NEXT_PUBLIC_` values are
+inlined at build time.
+
+**If the App Check page has no Register app button, do A3 first.** The AI Logic setup workflow is
+what enables the APIs *and* turns on App Check for AI Logic, and until it has been run once there
+is nothing for App Check to register against.
 
 **Not blocking for local work.** With the App Check debug token in `.env.local`, the SDK exchanges
-that token and never calls the reCAPTCHA provider, so the site key can stay empty until deployment.
+that token and never calls the reCAPTCHA provider, so the site key can stay empty until you are
+ready to deploy.
 
 **Why you:** the keypair is only ever shown on your screen, and I cannot read it.
 
-### A5. App Check debug token (I create it, you paste it)
-I run:
+### A5. App Check debug token — **done**
 
-```bash
-firebase appcheck:debugtokens:create --app <your-appId>
-```
+**Done, 20 Nov 2026.** Created with `firebase appcheck:debugtokens:create --app <webAppId>` and
+living in `.env.local` as `NEXT_PUBLIC_APPCHECK_DEBUG_TOKEN`. I verified it on 20 Nov: the debug
+token exchange returns 200, so the token is registered and App Check is passing.
 
-It prints a token. You paste it into `.env.local` as
-`NEXT_PUBLIC_APPCHECK_DEBUG_TOKEN`. **Never committed to git.**
+The console equivalent, if you ever need to rotate it: **Security → App Check → Apps tab → your
+app → overflow menu → Manage debug tokens**.
 
 Paste the literal token string, not the word `true` — a literal token does not expire, `true` does.
-
-**Why you:** the paste is one line into a file that is gitignored, and I will write the file for
-you if you would rather just tell me the value.
+**Never committed to git.**
 
 ### A6. Auth → Sign-in method → **Anonymous** → enable
+
 Console only. There is no `firebase auth:enable-provider` command; the CLI only does
 `auth:export` / `auth:import`.
 
 **Why you:** provider enablement is console-only.
 
 ### A7. Create the Firestore database (I can run this)
+
 I run:
 
 ```bash
@@ -132,15 +138,18 @@ Note: **this command can take a few minutes** on a brand-new Spark project, beca
 enables the API and provisions the database. That is normal, not a hang.
 
 ### A8. Remote Config — publish an empty template once
+
 If **Project settings → General** shows Remote Config as not initialised, open it and publish an
 empty template. Fetching an empty template is harmless, but publishing one avoids a first-run
-confusing error.
+confusing error. The Firebase guide also suggests Remote Config for moving model settings without
+republishing the app; that is a nice-to-have, not a blocker.
 
 ---
 
 ## B. Outside the repo, but not blocking (do during the build)
 
 ### B1. GitHub account + a repository for the project
+
 **Done, 20 Nov 2026.** The repo is `git@github.com:Stargnite/REDACT.git`, branch `main`, and the
 first commit is pushed. SSH authenticates as **Stargnite**.
 
@@ -159,12 +168,15 @@ gh auth login
 ```
 
 ### B2. A git identity
+
 **Done.** `Oluwatobi <tobi.sobayo@wazobia.tech>` is set globally on this machine.
 
 ### B3. The repo name and the public/private choice
+
 **Done.** The repo is `Stargnite/REDACT`, public, `main` as the default branch.
 
 ### B4. The demo video — recording and editing
+
 Devpost submissions almost always want a 2–3 minute video, and the hackathon rules require a
 working demo link.
 
@@ -187,24 +199,27 @@ model present. A recording made on another laptop will silently fall back to the
 the whole "nothing left your device" claim collapses on camera.
 
 ### B5. YouTube upload
+
 Upload the video unlisted, put the link in the Devpost submission. Unlisted, not private —
 private links fail for the judges who open the submission.
 
 ### B6. Devpost submission details
+
 The submission page needs:
 - Project name + tagline
 - Description (the marketing copy from the landing page, adapted — Devpost wants prose, the
   landing page wants restraint)
 - Built-with list: `Next.js`, `Firebase`, `AI Logic`, `Gemini Nano / Prompt API`, `Tailwind CSS`
 - The repo URL
-- The live demo URL (`https://<project-id>.web.app`)
+- The live demo URL (`https://redact-fdd1a.web.app`)
 - The video link
 - Screenshot(s)
 
 ### B7. The deployment domain
-Firebase Hosting gives `https://<project-id>.web.app` free on Spark. If you want a clean domain
-(`redact.app` or similar) that needs a registrar and possibly a Cloud Run/Hosting rewrite — **skip
-it.** The `.web.app` URL is free and is what judges expect.
+
+Firebase Hosting gives `https://redact-fdd1a.web.app` free on Spark. If you want a clean domain
+(`redact.app` or similar) that needs a registrar and possibly a Cloud Run/Hosting rewrite —
+**skip it.** The `.web.app` URL is free and is what judges expect.
 
 ---
 
@@ -216,6 +231,7 @@ it.** The `.web.app` URL is free and is what judges expect.
 | npm | 11.9.0 |
 | git | 2.37.1 (Apple Git-137.1) |
 | firebase-tools | 15.37.0, installed globally |
+| Firebase CLI auth | signed in as `tobyolamide22@gmail.com` |
 | Chrome | present, on-device Gemini Nano **available** and answering |
 | Free disk | ~29 GB — above the ~22 GB gate the on-device model needs |
 | `gh` | **not installed** |
@@ -228,10 +244,9 @@ it.** The `.web.app` URL is free and is what judges expect.
 
 | When | What | Why |
 |---|---|---|
-| Today | Run `firebase login` | Blocks every Firebase step |
-| Today | Confirm the project ID (`redact-local` or one you pick) | Permanent, globally unique |
-| Today | Run the AI Logic setup workflow (A3) | Enables the APIs and App Check |
-| Today | Paste the reCAPTCHA site key (not the secret key) | Only shown on your screen |
+| Today | Run the AI Logic setup workflow (A3) | Enables the APIs and App Check for AI Logic |
+| Today | Create the reCAPTCHA v3 key and register the app (A4) | The deployed demo has no debug token to fall back on |
+| Today | Paste the reCAPTCHA **site key** (not the secret key) | Only shown on your screen |
 | Today | Enable the Anonymous auth provider | Console-only |
 | This week | `brew install gh` + `gh auth login` | Optional - only to manage PRs from the CLI |
 | This week | `brew install ffmpeg` | Demo video |
@@ -250,6 +265,6 @@ plan already gives free, adds a second vendor and a second set of keys to a Fire
 and reintroduces exactly the server-and-secret risk that the no-backend design exists to remove.
 The full reasoning is in `REDACT_BUILD_PLAN.md` §6.
 
-The one piece of persistence we keep — the receipt that records *how many* findings a scan produced,
-not *what* was in it — is Firestore, metadata only, and it is optional: if it breaks, the receipt
-falls back to `localStorage` and the scrubber still works.
+The one piece of persistence we keep — the receipt that records *how many* findings a scan
+produced, not *what* was in it — is Firestore, metadata only, and it is optional: if it breaks,
+the receipt falls back to `localStorage` and the scrubber still works.
