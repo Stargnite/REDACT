@@ -36,14 +36,16 @@ export function getFirebaseApp(): FirebaseApp {
 export function startAppCheck(): void {
   if (appCheckStarted) return;
 
-  const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
-  if (!siteKey) return;
-
   const debugToken = process.env.NEXT_PUBLIC_APPCHECK_DEBUG_TOKEN;
   if (debugToken) {
     (globalThis as unknown as Record<string, string>).FIREBASE_APPCHECK_DEBUG_TOKEN =
       debugToken;
   }
+
+  // In debug mode the provider is never called, and its constructor does not
+  // validate the key, so a placeholder is enough to get past initialisation.
+  const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || "debug-placeholder-site-key";
+  if (!process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY && !debugToken) return;
 
   initializeAppCheck(getFirebaseApp(), {
     provider: new ReCaptchaV3Provider(siteKey),

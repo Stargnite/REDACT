@@ -52,19 +52,31 @@ The setup flow auto-enables **App Check for AI Logic**. Afterwards, confirm unde
 **Why you:** the API enablement is tied to your Google account's AI Studio consent flow.
 
 ### A4. App Check → reCAPTCHA v3 — register a keypair
-Console only. One field to copy:
+
+**Console path: Security → App Check → Apps tab → Register app.** (Not "Build".)
+
+**If the App Check page is missing, or has no "Register app" button, do A3 first.** The AI Logic
+setup workflow is what enables the APIs *and* turns on App Check for AI Logic. Until it has been
+run once, there is nothing for App Check to register against.
+
+One field to copy:
 - **Site key** → goes in `.env.local` as `NEXT_PUBLIC_RECAPTCHA_SITE_KEY`
 
-The **secret key is not needed.** It only signs tokens server-side, and REDACT has no server. Keep
-the secret key out of the repo regardless.
+**The secret key goes in the Firebase console, not in your code.** It is only used to sign tokens
+server-side and REDACT has no server, so you never paste it into `.env.local` and it never enters
+the repo.
 
-Register **two** domains: `localhost` and `your-project-id.web.app`.
+Register **two** domains in the App Check allowed-domains list: `localhost` and
+`redact-fdd1a.web.app`.
 
 > **Do NOT add `localhost` to the reCAPTCHA *allowed domains* list.** The Firebase docs are
 > explicit that the App Check allowed-domains list and the reCAPTCHA allowed-domains list are
 > different things, and adding localhost to the latter breaks local dev.
 
-**Why you:** the secret key is only ever shown once, on your screen, and I cannot read it.
+**Not blocking for local work.** With the App Check debug token in `.env.local`, the SDK exchanges
+that token and never calls the reCAPTCHA provider, so the site key can stay empty until deployment.
+
+**Why you:** the keypair is only ever shown on your screen, and I cannot read it.
 
 ### A5. App Check debug token (I create it, you paste it)
 I run:
@@ -74,7 +86,7 @@ firebase appcheck:debugtokens:create --app <your-appId>
 ```
 
 It prints a token. You paste it into `.env.local` as
-`NEXT_PUBLIC_FIREBASE_APPCHECK_DEBUG_TOKEN`. **Never committed to git.**
+`NEXT_PUBLIC_APPCHECK_DEBUG_TOKEN`. **Never committed to git.**
 
 Paste the literal token string, not the word `true` — a literal token does not expire, `true` does.
 
@@ -197,7 +209,8 @@ it.** The `.web.app` URL is free and is what judges expect.
 |---|---|---|
 | Today | Run `firebase login` | Blocks every Firebase step |
 | Today | Confirm the project ID (`redact-local` or one you pick) | Permanent, globally unique |
-| Today | Paste the reCAPTCHA site + secret key, and the debug token | Only shown on your screen |
+| Today | Run the AI Logic setup workflow (A3) | Enables the APIs and App Check |
+| Today | Paste the reCAPTCHA site key (not the secret key) | Only shown on your screen |
 | Today | Enable the Anonymous auth provider | Console-only |
 | This week | `brew install gh` + `gh auth login` | Optional - only to manage PRs from the CLI |
 | This week | `brew install ffmpeg` | Demo video |
