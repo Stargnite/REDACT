@@ -1,8 +1,10 @@
 import { mergeFindings, resolveRetentions } from "./offsets";
 import { toFindings, type ModelRunner, type Tier } from "./model";
+import { findLabelValues } from "./labels";
 import { findPatterns } from "./patterns";
 import { DEFAULT_CONTEXT } from "./purpose";
-import type { ScanContext, ScanMode, ScanResult } from "./types";
+import { describeType } from "./taxonomy";
+import type { Finding, ScanContext, ScanMode, ScanResult } from "./types";
 
 /**
  * A rough token estimate. The real on-device window is reported by the
@@ -37,6 +39,36 @@ export function chooseTier(text: string, mode: ScanMode): Tier {
 }
 
 /**
+ * The values written under a field label.
+ *
+ * A form says what its fields hold, so the field is sensitive whatever a
+ * small model happened to notice that day. And the on-device model is small:
+ * asked to read a form, it will sometimes report the name and the email and
+ * leave the address alone. Coverage that depends on the model's recall is
+ * coverage that comes and goes, so the fields a form is built from are covered
+ * here instead.
+ *
+ * These are pattern-tier findings, so a purpose that says a field is needed
+ * can still keep it.
+ */
+function labelFindings(text: string): Finding[] {
+  return findLabelValues(text).map((value) => {
+    const description = describeType(value.type);
+
+    return {
+      type: value.type,
+      label: description.label,
+      severity: description.severity,
+      quote: value.quote,
+      start: value.start,
+      end: value.end,
+      source: "pattern",
+      decision: "redact",
+    };
+  });
+}
+
+/**
  * The whole scan, end to end.
  *
  * The pattern tier always runs. The model tier runs when a runner is
@@ -52,7 +84,8 @@ export async function scrub(
   const startedAt = Date.now();
 
   const patternStartedAt = Date.now();
-  const patternFindings = findPatterns(text);
+  const labelTier = labelFindings(text);
+  const patternFindings = [...labelTier, ...findPatterns(text)];
   const patternsMs = Date.now() - patternStartedAt;
 
   const base: ScanResult = {
@@ -95,12 +128,34 @@ export async function scrub(
     };
   }
 
-  const { findings: modelFindings } = toFindings(text, run.raw, context);
-  const resolved = resolveRetentions([...patternFindings, ...modelFindings]);
+  const { findings: modelFindings, error: parseError, dropped } = toFindings(
+    text,
+    run.raw,
+    context
+  );
+
+  // A field label knows what its own field holds, so it settles the type of
+  // the span it covers. A model finding about the same words is dropped: it
+  // says nothing the label does not already say, and it says it less well.
+  const beyondLabels = modelFindings.filter(
+    (finding) =>
+      !labelTier.some(
+        (label) =>
+          finding.start >= label.start && finding.end <= label.end
+      )
+  );
+
+  const resolved = resolveRetentions([...patternFindings, ...beyondLabels]);
   const findings = mergeFindings(resolved);
   const retainedCount = findings.filter(
     (finding) => finding.decision === "retain"
   ).length;
+
+  // A model answer that cannot be read means the model tier did not finish.
+  // A span that cannot be placed means something was missed. They are
+  // reported apart: the first is a broken run, the second is a gap in the
+  // cover, and the user needs to be able to tell them apart.
+  const degradedReason = parseError;
 
   // The badge and the character counter report where the scan actually ran,
   // not where it was aimed. In auto mode a run that ended up in the cloud
@@ -118,6 +173,8 @@ export async function scrub(
     modelCount: findings.filter((finding) => finding.source === "model").length,
     retainedCount,
     context,
+    degradedReason,
+    unmatchedCount: dropped,
     durations: { patternsMs, modelMs, totalMs: Date.now() - startedAt },
   };
 }

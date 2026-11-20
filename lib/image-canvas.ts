@@ -1,27 +1,13 @@
-import { regionInPixels } from "./image";
 import type { BoundingBox } from "./types";
-import type { ImageRegion } from "./image";
 
 /**
  * Working with the picture itself.
  *
- * Everything here happens in the browser. The file is never uploaded to be
- * stored anywhere: it is decoded, shrunk, and drawn on, and the only thing
- * that can leave the machine is the model request, and only when the tier
- * says so.
+ * Everything here happens in the browser. The file is decoded and drawn on
+ * here, and the copy that comes back carries none of the metadata the
+ * original had. The picture itself is never sent anywhere: what can leave
+ * the machine is the text read out of it, and only when the tier says so.
  */
-
-/**
- * The long edge of the image we send to the model.
- *
- * Gemini reads a smaller image as well as a big one, and a phone screenshot
- * at full resolution is mostly wasted tokens. The boxes come back normalised,
- * so shrinking costs nothing but time.
- */
-export const MAX_IMAGE_DIMENSION = 1568;
-
-/** Above this the PNG is re-encoded as a JPEG, which is much smaller. */
-export const MAX_IMAGE_BYTES = 3_500_000;
 
 export interface LoadedImage {
   bitmap: ImageBitmap;
@@ -29,15 +15,8 @@ export interface LoadedImage {
   height: number;
 }
 
-export interface PreparedImage {
-  blob: Blob;
-  mimeType: string;
-  width: number;
-  height: number;
-}
-
 /** Decodes a file the user picked into something drawable. */
-export async function loadImage(file: File): Promise<LoadedImage> {
+export async function loadImage(file: Blob): Promise<LoadedImage> {
   const bitmap = await createImageBitmap(file);
 
   return {
@@ -48,100 +27,31 @@ export async function loadImage(file: File): Promise<LoadedImage> {
 }
 
 /**
- * Shrinks an image to the size we send to the model, and encodes it.
+ * The box to draw, in the pixels of the picture.
  *
- * PNG first, because a screenshot is text and JPEG smears text. A PNG that
- * comes out too big becomes a JPEG instead, because a request the model
- * refuses is worse than a slightly softer picture.
+ * A word read out of a screenshot is drawn on tightly, but not so tightly
+ * that the tail of a letter with a descender peeks out underneath it.
  */
-export async function prepareImage(image: LoadedImage): Promise<PreparedImage> {
-  const scale = Math.min(
-    1,
-    MAX_IMAGE_DIMENSION / Math.max(image.width, image.height)
-  );
+export function paddedBox(box: BoundingBox): BoundingBox {
+  const pad = Math.max(2, Math.round(Math.min(box.width, box.height) * 0.08));
 
-  const width = Math.max(1, Math.round(image.width * scale));
-  const height = Math.max(1, Math.round(image.height * scale));
-
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-
-  const context = canvas.getContext("2d");
-  if (!context) {
-    throw new Error("This browser cannot draw on a canvas.");
-  }
-
-  context.drawImage(image.bitmap, 0, 0, width, height);
-
-  const png = await toBlob(canvas, "image/png");
-
-  if (png.size <= MAX_IMAGE_BYTES) {
-    return { blob: png, mimeType: "image/png", width, height };
-  }
-
-  const jpeg = await toBlob(canvas, "image/jpeg", 0.92);
-  return { blob: jpeg, mimeType: "image/jpeg", width, height };
+  return {
+    x: Math.max(0, box.x - pad),
+    y: Math.max(0, box.y - pad),
+    width: box.width + pad * 2,
+    height: box.height + pad * 2,
+  };
 }
 
-function toBlob(
-  canvas: HTMLCanvasElement,
-  type: string,
-  quality?: number
-): Promise<Blob> {
+function toBlob(canvas: HTMLCanvasElement, type: string): Promise<Blob> {
   return new Promise((resolve, reject) => {
     canvas.toBlob(
       (blob) => {
         if (blob) resolve(blob);
-        else reject(new Error("The image could not be encoded."));
+        else reject(new Error("The picture could not be encoded."));
       },
-      type,
-      quality
+      type
     );
-  });
-}
-
-/** The base64 the SDK's inlineData part wants, without the data URL prefix. */
-export function toBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      const result = reader.result;
-      if (typeof result !== "string") {
-        reject(new Error("The image could not be read."));
-        return;
-      }
-      resolve(result.slice(result.indexOf(",") + 1));
-    };
-
-    reader.onerror = () => reject(new Error("The image could not be read."));
-    reader.readAsDataURL(blob);
-  });
-}
-
-/**
- * The rectangles in the pixels of the original picture.
- *
- * The padding is in pixels, not in thousandths, because a bar that is a
- * pixel too tight still shows the first letter of a name on some screens.
- */
-export function pixelBoxes(
-  regions: ImageRegion[],
-  width: number,
-  height: number
-): BoundingBox[] {
-  const pad = Math.max(2, Math.round(Math.min(width, height) * 0.006));
-
-  return regions.map((region) => {
-    const box = regionInPixels(region.box, width, height);
-
-    return {
-      x: Math.max(0, box.x - pad),
-      y: Math.max(0, box.y - pad),
-      width: Math.min(width, box.width + pad * 2),
-      height: Math.min(height, box.height + pad * 2),
-    };
   });
 }
 
@@ -154,8 +64,10 @@ export function pixelBoxes(
  */
 export async function drawRegions(
   image: LoadedImage,
-  regions: ImageRegion[]
-): Promise<Blob> {
+  boxes: BoundingBox[]
+): Promise<Blob | null> {
+  if (!boxes.length) return null;
+
   const canvas = document.createElement("canvas");
   canvas.width = image.width;
   canvas.height = image.height;
@@ -166,11 +78,16 @@ export async function drawRegions(
   }
 
   context.drawImage(image.bitmap, 0, 0);
-
   context.fillStyle = "#000000";
 
-  for (const box of pixelBoxes(regions, image.width, image.height)) {
-    context.fillRect(box.x, box.y, box.width, box.height);
+  for (const box of boxes) {
+    const padded = paddedBox(box);
+    context.fillRect(
+      Math.round(padded.x),
+      Math.round(padded.y),
+      Math.round(padded.width),
+      Math.round(padded.height)
+    );
   }
 
   return toBlob(canvas, "image/png");

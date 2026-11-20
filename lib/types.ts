@@ -105,6 +105,11 @@ export interface ScanResult {
   durations: ScanDurations;
   /** Populated when the model tier failed and we degraded to patterns only. */
   degradedReason?: string;
+  /**
+   * Spans the model reported that could not be placed in the text, so they
+   * were not covered. A non-zero count means the scan missed something.
+   */
+  unmatchedCount?: number;
 }
 
 /** The user's choice about which tier to use. */

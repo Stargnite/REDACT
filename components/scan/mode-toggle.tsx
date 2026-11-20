@@ -23,8 +23,8 @@ const HINTS: Record<Subject, Record<ScanMode, string>> = {
     cloud: "Always use the cloud model",
   },
   picture: {
-    auto: "Use the on-device model when it can see the picture",
-    on_device: "Never send the picture to a server",
+    auto: "Use the on-device model when the text fits",
+    on_device: "Never send the text read out of the picture to a server",
     cloud: "Always use the cloud model",
   },
 };

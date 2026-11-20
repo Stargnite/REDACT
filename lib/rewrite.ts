@@ -35,6 +35,8 @@ export const CREDENTIAL_TYPES: ReadonlySet<string> = new Set([
   "SLACK_WEBHOOK",
   "NPM_TOKEN",
   "TWILIO_ACCOUNT_SID",
+  "API_KEY",
+  "PASSWORD",
   "CREDIT_CARD",
   "IBAN",
   "ACCOUNT_NUMBER",

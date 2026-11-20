@@ -1,4 +1,4 @@
-import { applyOutput } from "./rewrite";
+import { applyOutput, isCredentialType } from "./rewrite";
 import type { Finding, Severity } from "./types";
 
 /**
@@ -232,7 +232,8 @@ function overlaps(a: Finding, b: Finding): boolean {
  * A retention is the model saying "this span is needed for the purpose", and
  * it cancels the pattern-tier finding for the same span. It never cancels
  * another model finding: when the model contradicts itself about a span, the
- * span is redacted, not kept.
+ * span is redacted, not kept. It never cancels a credential either, because a
+ * purpose is a hint and a secret is not.
  */
 export function resolveRetentions(findings: Finding[]): Finding[] {
   const retained = findings.filter((finding) => finding.decision === "retain");
@@ -241,6 +242,7 @@ export function resolveRetentions(findings: Finding[]): Finding[] {
   return findings.filter((finding) => {
     if (finding.decision === "retain") return true;
     if (finding.source !== "pattern") return true;
+    if (isCredentialType(finding.type)) return true;
     return !retained.some((keep) => overlaps(keep, finding));
   });
 }

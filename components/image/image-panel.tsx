@@ -5,9 +5,9 @@ import { PurposePicker } from "@/components/scan/context-controls";
 import { ModeToggle, modeHint } from "@/components/scan/mode-toggle";
 import { Hairline, SectionLabel } from "@/components/site/section-label";
 import { explainModelError } from "@/lib/errors";
-import { scrubImage, type ImageScrubResult } from "@/lib/image-scrub";
+import { scrubPicture, type PictureScrubResult } from "@/lib/image-scrub";
 import { purposeSpec } from "@/lib/purpose";
-import { createImageRunner } from "@/lib/runner";
+import { createModelRunner } from "@/lib/runner";
 import type { Purpose, ScanContext, ScanMode } from "@/lib/types";
 import { RegionRow } from "./region-row";
 
@@ -29,12 +29,12 @@ export function ImagePanel() {
   const [mode, setMode] = useState<ScanMode>("auto");
   const [purpose, setPurpose] = useState<Purpose>("general");
   const [purposeNote, setPurposeNote] = useState("");
-  const [result, setResult] = useState<ImageScrubResult | null>(null);
+  const [result, setResult] = useState<PictureScrubResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [rejected, setRejected] = useState<string | null>(null);
 
-  const runner = useMemo(() => createImageRunner(), []);
+  const runner = useMemo(() => createModelRunner(), []);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const resultsRef = useRef<HTMLElement | null>(null);
 
@@ -104,28 +104,39 @@ export function ImagePanel() {
 
     setBusy(true);
     try {
-      setResult(await scrubImage(file, { mode, context, runner: runner ?? undefined }));
+      setResult(
+        await scrubPicture(file, { mode, context, runner: runner ?? undefined })
+      );
     } finally {
       setBusy(false);
     }
   }
 
-  const modelError = result?.error ? explainModelError(result.error) : null;
+  const modelError = result?.degradedReason
+    ? explainModelError(result.degradedReason)
+    : null;
 
   const rows: [string, string][] = result
     ? [
         ["PURPOSE", purposeSpec(result.context.purpose).label],
         [
+          "TEXT READ",
+          result.transcript ? `${result.transcript.length} CHARS` : "NOTHING",
+        ],
+        [
           "TIER",
           result.source === "none"
-            ? "NOT RUN"
+            ? "PATTERNS ONLY"
             : result.source === "on_device"
               ? "ON DEVICE"
               : "IN CLOUD",
         ],
-        ["REGIONS", String(result.regions.length)],
-        ["IMAGE", `${result.width} x ${result.height}`],
-        ["SENT", result.bytesSent === 0 ? "NOTHING" : formatBytes(result.bytesSent)],
+        ["COVERED", String(result.regions.length)],
+        ["PICTURE", `${result.width} x ${result.height}`],
+        [
+          "TEXT SENT",
+          result.charsSent === 0 ? "NOTHING" : `${result.charsSent} CHARS`,
+        ],
         ["TIME", formatDuration(result.durationMs)],
       ]
     : [];
@@ -238,16 +249,38 @@ export function ImagePanel() {
             aria-live="polite"
           >
             {modelError ? (
-              <p className="mono text-accent">MODEL TIER · {modelError.label}</p>
+              <div className="border-l border-accent pl-4">
+                <p className="mono text-accent">{modelError.label}</p>
+                <p className="mt-2 max-w-[52ch] text-sm leading-relaxed text-muted">
+                  {modelError.code === "MALFORMED"
+                    ? "Part of what the model found could not be read, so a person's name, an employer or a street address may still be uncovered. Run it again before you send this on."
+                    : "Only the fixed-shape rules ran, so the things a rule cannot catch — a person's name, an employer, a street address — are probably still uncovered. Run it again on a machine with the on-device model, or in the cloud, before you send this on."}
+                </p>
+              </div>
+            ) : null}
+
+            {result.unmatchedCount ? (
+              <div className="border-l border-accent pl-4">
+                <p className="mono text-accent">
+                  {result.unmatchedCount} SPAN
+                  {result.unmatchedCount === 1 ? "" : "S"} NOT COVERED
+                </p>
+                <p className="mt-2 max-w-[52ch] text-sm leading-relaxed text-muted">
+                  The model found {result.unmatchedCount === 1 ? "a span" : "spans"}{" "}
+                  that could not be matched to the text in the picture, so
+                  {result.unmatchedCount === 1 ? " it is" : " they are"} still
+                  uncovered. Treat this scrub as partial.
+                </p>
+              </div>
             ) : null}
 
             {result.escalated ? (
               <p className="mt-4 border-l border-hairline pl-4 text-muted">
                 <span className="mono block text-faint">ESCALATED</span>
                 <span className="mt-1 block text-sm">
-                  The on-device model could not read the picture, so it was sent
-                  to the cloud model instead. That is the moment the picture
-                  left your machine.
+                  The on-device model was not available, so the text read out of
+                  the picture was sent to the cloud model instead. The picture
+                  itself stayed on your machine.
                 </span>
               </p>
             ) : null}
@@ -259,14 +292,22 @@ export function ImagePanel() {
             {result.regions.length > 0 ? (
               <ul className="mt-3">
                 {result.regions.map((region, index) => (
-                  <RegionRow key={`${region.type}-${index}`} region={region} index={index} />
+                  <RegionRow
+                    key={`${region.type}-${index}`}
+                    region={region}
+                    index={index}
+                  />
                 ))}
               </ul>
             ) : (
               <p className="mt-4 text-muted">
-                {modelError
-                  ? "Nothing could be checked."
-                  : "Nothing sensitive was found in the picture."}
+                {result.error
+                  ? "The picture could not be read."
+                  : result.degradedReason
+                    ? "The fixed-shape rules found nothing in this picture."
+                    : result.transcript
+                      ? "Nothing sensitive was found in the picture."
+                      : "No text could be read out of the picture."}
               </p>
             )}
 
@@ -296,6 +337,20 @@ export function ImagePanel() {
                 </p>
               </div>
             ) : null}
+
+            {result.transcript ? (
+              <div className="mt-10 sm:mt-14">
+                <h3 className="mono text-faint">WHAT WAS READ OUT OF IT</h3>
+                <Hairline className="mt-5" />
+                <pre className="mono mt-5 max-h-80 overflow-auto whitespace-pre-wrap break-words text-muted">
+                  {result.transcript}
+                </pre>
+                <p className="mt-3 max-w-[46ch] text-sm leading-relaxed text-muted">
+                  This is the whole of what the reader found in your picture.
+                  It is the only thing a model ever sees.
+                </p>
+              </div>
+            ) : null}
           </section>
         ) : null}
       </div>
@@ -319,6 +374,16 @@ export function ImagePanel() {
                 </div>
               ))}
             </dl>
+
+            <p className="mt-4 text-sm leading-relaxed text-muted">
+              The picture was read in your browser. It was never uploaded, and
+              it is not stored anywhere.
+            </p>
+
+            <p className="mono mt-4 text-faint">
+              {result.imageBytes ? formatBytes(result.imageBytes) : ""} READ
+              LOCALLY
+            </p>
           </div>
         ) : null}
       </aside>

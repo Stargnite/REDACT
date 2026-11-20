@@ -217,3 +217,72 @@ describe("the whole scan", () => {
     expect(result.findings.some((f) => f.type === "AWS_ACCESS_KEY")).toBe(true);
   });
 });
+
+describe("a form", () => {
+  const FORM = [
+    "FULL NAME",
+    "Amara Okonkwo",
+    "EMAIL",
+    "amara.okonkwo@northwind-labs.io",
+    "PHONE",
+    "+44 7700 900418",
+    "HOME ADDRESS",
+    "Flat 12, 88 Cavendish Road, London N12 6QT",
+    "EMPLOYER",
+    "Northwind Labs",
+    "API KEY",
+    "sk_live_TESTONLYKEY0000000000000000",
+  ].join("\n");
+
+  it("is covered field by field without asking a model", async () => {
+    const result = await scrub(FORM);
+
+    const covered = result.findings.map((finding) => finding.quote);
+
+    expect(covered).toContain("Amara Okonkwo");
+    expect(covered).toContain("amara.okonkwo@northwind-labs.io");
+    expect(covered).toContain("+44 7700 900418");
+    expect(covered).toContain("Flat 12, 88 Cavendish Road, London N12 6QT");
+    expect(covered).toContain("Northwind Labs");
+    expect(covered).toContain("sk_live_TESTONLYKEY0000000000000000");
+  });
+
+  it("is covered in full even when the model misses half of it", async () => {
+    // What the on-device model actually returned on one run: the name and the
+    // email, and nothing else. The address and the key were left alone.
+    const { runner } = runnerFor(
+      '{"findings":[{"type":"PERSON","quote":"Amara Okonkwo"}]}'
+    );
+    const result = await scrub(FORM, { runner });
+
+    const covered = result.findings.map((finding) => finding.quote);
+
+    expect(covered).toContain("Amara Okonkwo");
+    expect(covered).toContain("Flat 12, 88 Cavendish Road, London N12 6QT");
+    expect(covered).toContain("sk_live_TESTONLYKEY0000000000000000");
+  });
+
+  it("takes the type from the field the model got wrong", async () => {
+    // The model called the employer a person. The form says what the field
+    // holds, so the field wins.
+    const { runner } = runnerFor(
+      '{"findings":[{"type":"PERSON","quote":"Northwind Labs"}]}'
+    );
+    const result = await scrub(FORM, { runner });
+
+    const employer = result.findings.find(
+      (finding) => finding.quote === "Northwind Labs"
+    );
+
+    expect(employer?.type).toBe("EMPLOYER");
+  });
+
+  it("never leaves the value of a field uncovered", async () => {
+    const { runner } = runnerFor(
+      '{"findings":[{"type":"PERSON","quote":"FULL NAME"}]}'
+    );
+    const result = await scrub(FORM, { runner });
+
+    expect(maskText(FORM, result.findings)).not.toContain("Amara Okonkwo");
+  });
+});

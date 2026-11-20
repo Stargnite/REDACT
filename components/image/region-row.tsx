@@ -1,6 +1,6 @@
 "use client";
 
-import type { ImageRegion } from "@/lib/image";
+import type { PictureRegion } from "@/lib/image-scrub";
 import type { Severity } from "@/lib/types";
 
 /**
@@ -18,7 +18,7 @@ export function RegionRow({
   region,
   index,
 }: {
-  region: ImageRegion;
+  region: PictureRegion;
   index: number;
 }) {
   const decoration = DECORATION[region.severity];
@@ -39,9 +39,13 @@ export function RegionRow({
             textDecorationColor: "var(--color-accent)",
           }}
         >
-          {Math.round(region.box.x)} , {Math.round(region.box.y)} ·{" "}
-          {Math.round(region.box.width)} x {Math.round(region.box.height)}
+          {region.quote}
         </span>
+      </p>
+
+      <p className="mt-1 mono text-faint">
+        {Math.round(region.box.x)} , {Math.round(region.box.y)} ·{" "}
+        {Math.round(region.box.width)} x {Math.round(region.box.height)}
       </p>
     </li>
   );

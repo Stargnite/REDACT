@@ -10,6 +10,7 @@ export type ModelTierErrorCode =
   | "APP_CHECK"
   | "NETWORK"
   | "MODEL_UNAVAILABLE"
+  | "MALFORMED"
   | "UNKNOWN";
 
 export interface ModelTierError {
@@ -30,6 +31,7 @@ const QUOTA = /quota|resource_exhausted/i;
 const APP_CHECK = /app ?check/i;
 const MODEL_UNAVAILABLE = /on-device|on device|user activation|no available model|model not (found|available)/i;
 const NETWORK = /failed to fetch|networkerror|network request failed|err_network|err_connection|err_internet|load failed/i;
+const MALFORMED = /answer was malformed|malformed answer/i;
 
 /**
  * The SDK reports the reset window in the quota message, e.g. "Please retry in
@@ -90,6 +92,17 @@ export function explainModelError(raw: string): ModelTierError {
       label: "NO CONNECTION",
       title: "The request never reached the model.",
       detail: "The browser could not reach Firebase. Check the connection and scan again.",
+    };
+  }
+
+  if (MALFORMED.test(raw)) {
+    return {
+      ...base,
+      code: "MALFORMED",
+      label: "ANSWER MALFORMED",
+      title: "The model answered in a shape we could only partly read.",
+      detail:
+        "What could be read was used. Some of what the model found was lost, so treat this as a partial scrub.",
     };
   }
 

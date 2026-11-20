@@ -31,6 +31,8 @@ export const TYPES = [
   "SLACK_WEBHOOK",
   "NPM_TOKEN",
   "TWILIO_ACCOUNT_SID",
+  "API_KEY",
+  "PASSWORD",
   "CREDIT_CARD",
   "IBAN",
   "EMAIL",
@@ -51,13 +53,14 @@ const BASE_RULES = `Rules:
 3. Do not report the same span twice.
 4. If you are not confident, leave it out. A false positive costs the user more trust than a miss costs them safety.
 5. Report a person's name only when the text gives you a reason to believe it is a real name and not a product, a placeholder, or an example.
-6. Report nothing at all if the text contains nothing sensitive.`;
+6. Report nothing at all if the text contains nothing sensitive.
+7. A value can be made of several parts - a name with a title, a street with a city and a postcode, a company with a suffix. When you report one, report every part of it together as a single span, copied from one place in the input. Never report only part of a value.`;
 
-const RETENTION_RULE = `7. Set "decision" to "retain" only when the purpose says the span is needed for it. When you are unsure, set "decision" to "redact".`;
+const RETENTION_RULE = `8. Set "decision" to "retain" only when the purpose says the span is needed for it. When you are unsure, set "decision" to "redact".`;
 
-const NO_RETENTION_RULE = `7. Set "decision" to "redact" for every span. Nothing is safe to keep for this purpose.`;
+const NO_RETENTION_RULE = `8. Set "decision" to "redact" for every span. Nothing is safe to keep for this purpose.`;
 
-const REWRITE_RULE = `8. The "replacement" must not contain any part of the original name, number, address or identifier. "Northwind Logistics" becomes "a logistics firm", never "Northwind Co". Never write a replacement for a credential such as an API key or a card number.`;
+const REWRITE_RULE = `9. The "replacement" must not contain any part of the original name, number, address or identifier. "Northwind Logistics" becomes "a logistics firm", never "Northwind Co". Never write a replacement for a credential such as an API key or a card number.`;
 
 export const OUTPUT_SHAPE = '{"findings": [{"type": "EMAIL", "quote": "jane@example.com"}]}';
 
@@ -110,5 +113,5 @@ export function schemaHint(context: ScanContext): string {
   }
 
   return `Return ONLY JSON, with this exact shape and nothing else:
-{"findings": [${fields.join(", ")}]}`;
+{"findings": [{${fields.join(", ")}}]}`;
 }

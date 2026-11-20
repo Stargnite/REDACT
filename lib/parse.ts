@@ -145,3 +145,55 @@ function tryParse(candidate: string): LooseParse {
     };
   }
 }
+
+/**
+ * Every balanced JSON object in a string, at any depth.
+ *
+ * A model answer can be unusable as a whole and still hold readable objects
+ * inside it. A small on-device model will copy a half-remembered schema and
+ * emit a brace in the wrong place, and the result is not JSON. Throwing the
+ * whole answer away for that loses findings the model did get right, so the
+ * objects are taken out and read one at a time.
+ *
+ * Objects whose braces do not balance are simply not returned: there is no
+ * safe way to guess where a truncated object ended.
+ */
+export function findJsonObjects(raw: string): string[] {
+  const objects: string[] = [];
+  const open: number[] = [];
+
+  let inString = false;
+  let escaped = false;
+
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw.charAt(i);
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (ch === BACKSLASH) {
+        escaped = true;
+      } else if (ch === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (ch === '"') {
+      inString = true;
+      continue;
+    }
+
+    if (ch === "{") {
+      open.push(i);
+      continue;
+    }
+
+    if (ch === "}") {
+      const start = open.pop();
+      if (start !== undefined) objects.push(raw.slice(start, i + 1));
+    }
+  }
+
+  return objects;
+}

@@ -1,123 +1,176 @@
-import {
-  drawRegions,
-  loadImage,
-  prepareImage,
-  toBase64,
-} from "./image-canvas";
-import { parseRegions, type ImageRegion } from "./image";
-import type { ImageRunner } from "./model";
-import type { ScanContext, ScanMode } from "./types";
+import { drawRegions, loadImage } from "./image-canvas";
+import { boxForSpan, readImageText, type OcrTranscript } from "./ocr";
+import { scrub } from "./scrub";
+import type { ModelRunner } from "./model";
+import type { BoundingBox, ScanContext, ScanMode, Severity } from "./types";
 
 /**
  * Scrubbing a picture.
  *
- * The flow is: decode the file, shrink a copy for the model, ask the model
- * where the sensitive parts are, check the rectangles, and draw them on the
- * original picture. The original pixels are never sent anywhere; only the
- * shrunk copy is, and only in the cloud tier.
+ * The flow is: read the words out of the picture, on this machine; scan that
+ * text with the tiers the text scanner already uses; and draw the spans that
+ * came back on the picture, exactly where the words were.
+ *
+ * The picture is never sent to a model. A model is good at reading text and
+ * bad at saying where the text is, and a picture is worth redacting only if
+ * the bars land on the right words. So the reader finds the words and where
+ * they are, and the model is asked the same question it is asked about any
+ * other text: which of these should not leave the machine.
  */
 
-export interface ImageScrubOptions {
-  mode: ScanMode;
-  context: ScanContext;
-  runner?: ImageRunner;
+export interface PictureRegion {
+  /** The machine code, e.g. "EMAIL". */
+  type: string;
+  /** The human label. */
+  label: string;
+  severity: Severity;
+  /** The box in the pixels of the picture. */
+  box: BoundingBox;
+  /** The text that was found, so the user can see what was covered. */
+  quote: string;
 }
 
-export interface ImageScrubResult {
-  /** The regions that survived the checks. */
-  regions: ImageRegion[];
-  /** The scrubbed picture. Null when the scan did not get that far. */
+export interface PictureScrubOptions {
+  mode: ScanMode;
+  context: ScanContext;
+  /** Omit it and the scan runs the pattern tier only. */
+  runner?: ModelRunner;
+  /** Reads the words out of a picture. Injected so it can be tested. */
+  read?: (blob: Blob) => Promise<OcrTranscript>;
+}
+
+export interface PictureScrubResult {
+  /** The spans that were covered. */
+  regions: PictureRegion[];
+  /** The scrubbed picture. Null when there was nothing to cover. */
   output: Blob | null;
-  /** Where the run actually happened. */
+  /** The text that was read out of the picture. */
+  transcript: string;
+  /** Where the scan of that text ran. */
   source: "on_device" | "in_cloud" | "none";
   /** True when the run had to move from the device to the cloud. */
   escalated: boolean;
-  /** Bytes of picture that left the machine. */
-  bytesSent: number;
-  /** Bytes of the picture that was sent to the model. */
-  bytesTotal: number;
-  /** The size of the original picture. */
+  /** Characters of text that left the machine. Zero for every on-device run. */
+  charsSent: number;
+  /** The size of the picture, in bytes. */
+  imageBytes: number;
   width: number;
   height: number;
   durationMs: number;
-  /** The context the run was under, echoed back for the receipt. */
   context: ScanContext;
-  /** Set when the model tier could not run at all. */
+  /** Set when the model tier could not run, so only the rules ran. */
+  degradedReason?: string;
+  /** Spans the model reported that could not be placed, so they are uncovered. */
+  unmatchedCount?: number;
+  /** Set when the picture could not be read at all. */
   error?: string;
 }
 
-export async function scrubImage(
-  file: File,
-  options: ImageScrubOptions
-): Promise<ImageScrubResult> {
+/**
+ * How much two boxes have to overlap before they are the same region.
+ *
+ * The pattern tier can match the same phone twice, once with the country
+ * code and once without. In text that is two findings about one span. On a
+ * picture they land on the same pixels, so one of them is dropped rather
+ * than drawn twice and counted twice.
+ */
+const OVERLAP_THRESHOLD = 0.5;
+
+function overlapRatio(a: BoundingBox, b: BoundingBox): number {
+  const left = Math.max(a.x, b.x);
+  const top = Math.max(a.y, b.y);
+  const right = Math.min(a.x + a.width, b.x + b.width);
+  const bottom = Math.min(a.y + a.height, b.y + b.height);
+
+  if (right <= left || bottom <= top) return 0;
+
+  const shared = (right - left) * (bottom - top);
+  const smaller = Math.min(a.width * a.height, b.width * b.height);
+
+  return smaller > 0 ? shared / smaller : 0;
+}
+
+export async function scrubPicture(
+  file: Blob,
+  options: PictureScrubOptions
+): Promise<PictureScrubResult> {
   const started = Date.now();
-
   const loaded = await loadImage(file);
-  const prepared = await prepareImage(loaded);
+  const read = options.read ?? readImageText;
 
-  const base = {
-    regions: [] as ImageRegion[],
-    output: null as Blob | null,
-    escalated: false,
-    bytesSent: 0,
-    bytesTotal: prepared.blob.size,
-    width: loaded.width,
-    height: loaded.height,
-    context: options.context,
-  };
+  let transcript: OcrTranscript;
 
-  if (!options.runner) {
+  try {
+    transcript = await read(file);
+  } catch (error) {
     return {
-      ...base,
+      regions: [],
+      output: null,
+      transcript: "",
       source: "none",
+      escalated: false,
+      charsSent: 0,
+      imageBytes: file.size,
+      width: loaded.width,
+      height: loaded.height,
       durationMs: Date.now() - started,
+      context: options.context,
       error:
-        "No model tier is configured, so nothing could be found in the picture.",
+        error instanceof Error && error.message
+          ? error.message
+          : "The picture could not be read.",
     };
   }
 
-  const input = {
-    base64: await toBase64(prepared.blob),
-    mimeType: prepared.mimeType,
-    width: prepared.width,
-    height: prepared.height,
-    bytes: prepared.blob.size,
-  };
+  const scan = await scrub(transcript.text, {
+    mode: options.mode,
+    runner: options.runner,
+    context: options.context,
+  });
 
-  const wantsDevice = options.mode !== "cloud";
+  const regions: PictureRegion[] = [];
 
-  let run = wantsDevice
-    ? await options.runner(input, "on_device", options.context)
-    : await options.runner(input, "cloud", options.context);
+  for (const finding of scan.findings) {
+    if (finding.decision !== "redact") continue;
 
-  let escalated = false;
+    const box = boxForSpan(transcript, finding.start, finding.end);
+    if (!box) continue;
 
-  // The on-device model may simply not be able to see. When the mode is auto,
-  // that is a reason to go to the cloud, and the receipt has to say so.
-  if (!run.ok && wantsDevice && options.mode === "auto") {
-    run = await options.runner(input, "cloud", options.context);
-    escalated = true;
+    const duplicate = regions.some(
+      (region) => overlapRatio(region.box, box) > OVERLAP_THRESHOLD
+    );
+    if (duplicate) continue;
+
+    regions.push({
+      type: finding.type,
+      label: finding.label,
+      severity: finding.severity,
+      quote: finding.quote,
+      box,
+    });
   }
-
-  if (!run.ok) {
-    return {
-      ...base,
-      source: wantsDevice && !escalated ? "on_device" : "in_cloud",
-      escalated,
-      durationMs: Date.now() - started,
-      error: run.error ?? "The model tier could not run.",
-    };
-  }
-
-  const regions = parseRegions(run.raw);
 
   return {
-    ...base,
     regions,
-    output: await drawRegions(loaded, regions),
-    source: run.source,
-    escalated,
-    bytesSent: run.bytesSent,
+    output: await drawRegions(
+      loaded,
+      regions.map((region) => region.box)
+    ),
+    transcript: transcript.text,
+    source:
+      scan.inferenceSource === "IN_CLOUD"
+        ? "in_cloud"
+        : scan.inferenceSource === "ON_DEVICE"
+          ? "on_device"
+          : "none",
+    escalated: scan.escalated,
+    charsSent: scan.charsSent,
+    imageBytes: file.size,
+    width: loaded.width,
+    height: loaded.height,
     durationMs: Date.now() - started,
+    context: options.context,
+    degradedReason: scan.degradedReason,
+    unmatchedCount: scan.unmatchedCount,
   };
 }

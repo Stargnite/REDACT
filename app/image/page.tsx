@@ -14,10 +14,11 @@ export default function ImagePage() {
 
       <p className="measure mt-6 text-muted">
         Most of the personal information you are about to paste is not in the
-        text you copy. It is in the screenshot. REDACT looks at a picture, finds
-        the regions that would identify you, and covers them with black bars.
-        The picture is drawn in your browser, and it only reaches a server if
-        you ask for the cloud model.
+        text you copy. It is in the screenshot. REDACT reads the words out of
+        the picture on your machine, scans that text with the same tiers the
+        text scanner uses, and covers the words that would identify you with
+        black bars. The picture never leaves the browser. Only the text read
+        out of it can, and only if you ask for the cloud model.
       </p>
 
       <div className="mt-10 sm:mt-14">

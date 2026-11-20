@@ -162,6 +162,14 @@ export function ScanPanel() {
               </div>
             ) : null}
 
+            {result.unmatchedCount ? (
+              <div className="mt-6">
+                <EscalationNotice
+                  reason={`The model reported ${result.unmatchedCount} span${result.unmatchedCount === 1 ? "" : "s"} that could not be matched to the text, so ${result.unmatchedCount === 1 ? "it is" : "they are"} still uncovered. Treat this scrub as partial.`}
+                />
+              </div>
+            ) : null}
+
             {result.escalated ? (
               <div className="mt-6">
                 <EscalationNotice reason="The text was larger than the on-device model can hold, so it was sent to the cloud model instead." />
