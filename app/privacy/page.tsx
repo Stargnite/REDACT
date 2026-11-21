@@ -31,11 +31,6 @@ const FACTS = [
   },
   {
     index: "05",
-    title: "The leak test only sends the copy",
-    body: "The probe that checks a clean copy for leaks is given the copy and the kinds of thing that were removed. It never gets the original, so even when the probe runs in the cloud, the only text that leaves the machine is text you were about to send anyway.",
-  },
-  {
-    index: "06",
     title: "A picture is read, not uploaded",
     body: "The picture you pick is decoded and read in the page, by an optical character reader that runs in a worker on your machine, and it is drawn on with black bars. The picture itself never reaches a server, in any tier. What can leave is the text read out of it, and the receipt says how many characters went and when.",
   },

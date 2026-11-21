@@ -8,7 +8,6 @@ import { useEffect, useState } from "react";
 const LINKS = [
   { href: "/scan", label: "Scan" },
   { href: "/image", label: "Picture" },
-  { href: "/leak-test", label: "Proof" },
   { href: "/how-it-works", label: "How it works" },
   { href: "/privacy", label: "Privacy" },
 ];
@@ -16,7 +15,7 @@ const LINKS = [
 /**
  * The header.
  *
- * Five links do not fit on a phone, so on a narrow screen they go behind a
+ * Four links do not fit on a phone, so on a narrow screen they go behind a
  * menu button instead of being squeezed into a row that runs off the edge.
  * From the medium breakpoint up the row comes back, because there the links
  * fit without being shortened or wrapped.

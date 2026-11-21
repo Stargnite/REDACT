@@ -98,30 +98,7 @@ export default function HowItWorksPage() {
         </p>      </section>
 
       <section className="mx-auto mt-[clamp(7rem,14vw,12rem)] max-w-[var(--content-w)] px-[var(--gutter)]">
-        <SectionLabel index="03">The leak test</SectionLabel>
-        <Hairline className="mt-6" />
-
-        <Reveal>
-          <div className="measure-tight pt-7">
-            <p className="text-muted">
-              A redaction that leaves a trace is not a redaction. The leak test
-              scrubs the text, then attacks its own work: it checks whether
-              anything came back through the rewrite, and asks the model what a
-              reader could still work out from the copy alone.
-            </p>
-            <p className="mt-6 text-muted">
-              The model is never the judge of its own work here either. A claim
-              is only accepted when it quotes the clean copy, so a reader can go
-              and look, and a claim that carries part of a secret is dropped
-              before it is written down. The probe is never shown the original,
-              which means the report can never be the thing that leaks.
-            </p>
-          </div>
-        </Reveal>
-      </section>
-
-      <section className="mx-auto mt-[clamp(7rem,14vw,12rem)] max-w-[var(--content-w)] px-[var(--gutter)]">
-        <SectionLabel index="04">Pictures</SectionLabel>
+        <SectionLabel index="03">Pictures</SectionLabel>
         <Hairline className="mt-6" />
 
         <Reveal>
