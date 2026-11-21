@@ -289,8 +289,26 @@ export function ScanPanel() {
       </div>
 
       <div className="sticky bottom-0 z-20 -mx-[var(--gutter)] border-t border-hairline bg-canvas px-[var(--gutter)] pt-4 pb-5">
+        <button
+          type="button"
+          onClick={() => setControlsOpen((open) => !open)}
+          aria-expanded={controlsOpen}
+          aria-controls="scan-settings"
+          aria-label={`${controlsOpen ? "Hide" : "Show"} settings. Purpose ${purposeSpec(purpose).label}, output ${OUTPUT_LABEL[outputForm]}, tier ${MODE_LABEL[mode]}.`}
+          className="mono flex w-full items-center justify-between gap-3 text-faint transition-colors duration-150 hover:text-accent"
+        >
+          <span>
+            <span className="text-faint">SETTINGS</span> ·{" "}
+            {purposeSpec(purpose).label} · {OUTPUT_LABEL[outputForm]} ·{" "}
+            {MODE_LABEL[mode]}
+          </span>
+          <span className="shrink-0 text-accent">
+            {controlsOpen ? "HIDE" : "CHANGE"}
+          </span>
+        </button>
+
         {controlsOpen ? (
-          <div className="grid gap-5">
+          <div id="scan-settings" className="grid gap-5 pt-5">
             <PurposePicker
               purpose={purpose}
               onChange={setPurpose}
@@ -306,32 +324,8 @@ export function ScanPanel() {
                 {modeHint(mode)}
               </p>
             </div>
-
-            {result ? (
-              <button
-                type="button"
-                onClick={() => setControlsOpen(false)}
-                className="mono justify-self-start text-muted transition-colors duration-150 hover:text-accent"
-              >
-                HIDE THESE
-              </button>
-            ) : null}
           </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setControlsOpen(true)}
-            aria-label={`Settings: purpose ${purposeSpec(purpose).label}, output ${OUTPUT_LABEL[outputForm]}, tier ${MODE_LABEL[mode]}. Change them.`}
-            className="mono flex w-full items-center justify-between gap-3 text-faint transition-colors duration-150 hover:text-accent"
-          >
-            <span>
-              <span className="text-faint">SETTINGS</span> ·{" "}
-              {purposeSpec(purpose).label} · {OUTPUT_LABEL[outputForm]} ·{" "}
-              {MODE_LABEL[mode]}
-            </span>
-            <span className="shrink-0 text-accent">CHANGE</span>
-          </button>
-        )}
+        ) : null}
 
         <Textarea
           ref={textareaRef}
