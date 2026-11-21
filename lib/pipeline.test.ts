@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { maskText } from "./offsets";
+import { findingsMissingFrom, maskText } from "./offsets";
 import { parseLooseJson } from "./parse";
 import { findPatterns } from "./patterns";
 import { toFindings, type ModelRunner, type Tier } from "./model";
 import { scrub, ON_DEVICE_TOKEN_BUDGET } from "./scrub";
+import type { Finding } from "./types";
 
 /**
  * These tests cover the part of REDACT that does not need a browser, a
@@ -284,5 +285,52 @@ describe("a form", () => {
     const result = await scrub(FORM, { runner });
 
     expect(maskText(FORM, result.findings)).not.toContain("Amara Okonkwo");
+  });
+});
+
+describe("the two tiers, compared", () => {
+  const finding = (
+    type: string,
+    start: number,
+    end: number
+  ): Finding => ({
+    type,
+    label: type,
+    severity: "high",
+    quote: "x".repeat(end - start),
+    start,
+    end,
+    source: "model",
+    decision: "redact",
+  });
+
+  it("reports what the other tier found and this one did not", () => {
+    const extra = findingsMissingFrom(
+      [finding("EMAIL", 0, 10), finding("PHONE", 20, 30)],
+      [finding("EMAIL", 0, 10)]
+    );
+
+    expect(extra).toHaveLength(1);
+    expect(extra[0].type).toBe("PHONE");
+  });
+
+  it("reports nothing when the other tier found the same spans", () => {
+    const extra = findingsMissingFrom(
+      [finding("EMAIL", 0, 10)],
+      [finding("EMAIL", 0, 10)]
+    );
+
+    expect(extra).toHaveLength(0);
+  });
+
+  it("does not count a span this tier already covered differently", () => {
+    // The device covered the whole line, the cloud covered the part of it
+    // that held the email. The email is covered, so it is not missing.
+    const extra = findingsMissingFrom(
+      [finding("EMAIL", 5, 15)],
+      [finding("FORM_LINE", 0, 20)]
+    );
+
+    expect(extra).toHaveLength(0);
   });
 });

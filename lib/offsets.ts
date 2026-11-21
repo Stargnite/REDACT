@@ -227,6 +227,22 @@ function overlaps(a: Finding, b: Finding): boolean {
 }
 
 /**
+ * The findings in `extra` that `existing` does not already cover.
+ *
+ * This is how the two tiers are compared. The spans the cloud found that the
+ * device did not are exactly the spans the device would have missed, and the
+ * difference between the two runs is what a cloud request buys.
+ */
+export function findingsMissingFrom(
+  extra: Finding[],
+  existing: Finding[]
+): Finding[] {
+  return extra.filter(
+    (finding) => !existing.some((other) => overlaps(other, finding))
+  );
+}
+
+/**
  * Applies retentions.
  *
  * A retention is the model saying "this span is needed for the purpose", and

@@ -208,19 +208,53 @@ type TesseractWorker = {
 
 let workerPromise: Promise<TesseractWorker> | null = null;
 
+/** What the reader is doing right now, and how far along it is. */
+export interface OcrProgress {
+  /** From 0 to 1, when the reader can say. */
+  fraction: number | null;
+  /** What to tell the user. */
+  label: string;
+}
+
+export type OcrProgressReporter = (progress: OcrProgress) => void;
+
+/**
+ * Where the reader's reports go.
+ *
+ * The reader is kept between pictures, so its logger is set once, when the
+ * worker is made. The sink points at whoever is reading a picture right now,
+ * which is how the first picture reports its slow start and the second one
+ * reports only the reading.
+ */
+let sink: OcrProgressReporter | null = null;
+
+function report(progress: OcrProgress): void {
+  sink?.(progress);
+}
+
 /**
  * Reads a picture.
  *
  * The reader is kept between pictures, because starting it costs a few
  * seconds and every picture after the first is then quick.
  */
-export async function readImageText(blob: Blob): Promise<OcrTranscript> {
-  const worker = await getWorker();
+export async function readImageText(
+  blob: Blob,
+  onProgress?: OcrProgressReporter
+): Promise<OcrTranscript> {
+  const previous = sink;
+  sink = onProgress ?? null;
 
-  const { data } = await worker.recognize(blob, {}, { blocks: true });
-  const words = collectWords(data.blocks);
+  try {
+    const worker = await getWorker();
 
-  return buildTranscript(groupWordsIntoLines(words));
+    const { data } = await worker.recognize(blob, {}, { blocks: true });
+    const words = collectWords(data.blocks);
+
+    return buildTranscript(groupWordsIntoLines(words));
+  } finally {
+    sink = previous;
+  }
 }
 
 /** Pulls the words and their boxes out of whatever shape the reader used. */
@@ -290,6 +324,15 @@ async function createReader(): Promise<TesseractWorker> {
     workerPath: "/tesseract/worker.min.js",
     corePath: "/tesseract/tesseract-core-simd-lstm.wasm.js",
     langPath: "/tessdata",
-    logger: () => {},
+    logger: (message: unknown) => {
+      const record = (message ?? {}) as { status?: string; progress?: number };
+      const reading = record.status === "recognizing text";
+
+      report({
+        fraction:
+          typeof record.progress === "number" ? record.progress : null,
+        label: reading ? "READING THE PICTURE" : "STARTING THE READER",
+      });
+    },
   })) as unknown as TesseractWorker;
 }

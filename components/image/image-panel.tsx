@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PurposePicker } from "@/components/scan/context-controls";
 import { ModeToggle, modeHint } from "@/components/scan/mode-toggle";
+import { ScrubProgress } from "@/components/scan/progress";
 import { Hairline, SectionLabel } from "@/components/site/section-label";
 import { explainModelError } from "@/lib/errors";
 import { scrubPicture, type PictureScrubResult } from "@/lib/image-scrub";
+import { applyStep, PICTURE_STEPS, type ProgressStep } from "@/lib/progress";
 import { purposeSpec } from "@/lib/purpose";
 import { createModelRunner } from "@/lib/runner";
 import type { Purpose, ScanContext, ScanMode } from "@/lib/types";
@@ -31,6 +33,7 @@ export function ImagePanel() {
   const [purposeNote, setPurposeNote] = useState("");
   const [result, setResult] = useState<PictureScrubResult | null>(null);
   const [busy, setBusy] = useState(false);
+  const [steps, setSteps] = useState<ProgressStep[]>(PICTURE_STEPS);
   const [dragging, setDragging] = useState(false);
   const [rejected, setRejected] = useState<string | null>(null);
 
@@ -103,9 +106,15 @@ export function ImagePanel() {
     if (!file) return;
 
     setBusy(true);
+    setSteps(PICTURE_STEPS);
     try {
       setResult(
-        await scrubPicture(file, { mode, context, runner: runner ?? undefined })
+        await scrubPicture(file, {
+          mode,
+          context,
+          runner: runner ?? undefined,
+          onProgress: (step) => setSteps((previous) => applyStep(previous, step)),
+        })
       );
     } finally {
       setBusy(false);
@@ -240,6 +249,12 @@ export function ImagePanel() {
 
         {!runner ? (
           <p className="mono mt-5 text-faint">MODEL TIER OFFLINE</p>
+        ) : null}
+
+        {busy ? (
+          <div className="mt-8">
+            <ScrubProgress steps={steps} running={busy} />
+          </div>
         ) : null}
 
         {result ? (

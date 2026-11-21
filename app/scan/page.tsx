@@ -9,10 +9,10 @@ export const metadata: Metadata = {
 
 export default function ScanPage() {
   return (
-    <section className="mx-auto max-w-[var(--content-w)] px-[var(--gutter)] pt-[clamp(4rem,9vw,7rem)]">
-      <h1 className="text-display text-text">Scan</h1>
+    <section className="mx-auto flex min-h-[calc(100dvh-4.5rem)] max-w-[56rem] flex-col px-[var(--gutter)] pt-[clamp(2rem,5vw,3.5rem)] pb-4">
+      <h1 className="text-h1 text-text">Scan</h1>
 
-      <p className="measure mt-6 text-muted">
+      <p className="measure mt-5 text-muted">
         Paste the text you are about to send to an assistant. Say where it is
         going, and REDACT finds the spans that are sensitive for that
         destination, then hands back a copy with each one replaced by a token
@@ -20,7 +20,7 @@ export default function ScanPage() {
         readable.
       </p>
 
-      <div className="mt-10 sm:mt-14">
+      <div className="mt-8 flex flex-1 flex-col">
         <ScanPanel />
       </div>
     </section>

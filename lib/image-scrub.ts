@@ -1,5 +1,11 @@
 import { drawRegions, loadImage } from "./image-canvas";
-import { boxForSpan, readImageText, type OcrTranscript } from "./ocr";
+import {
+  boxForSpan,
+  readImageText,
+  type OcrProgressReporter,
+  type OcrTranscript,
+} from "./ocr";
+import type { ProgressReporter } from "./progress";
 import { scrub } from "./scrub";
 import type { ModelRunner } from "./model";
 import type { BoundingBox, ScanContext, ScanMode, Severity } from "./types";
@@ -36,7 +42,9 @@ export interface PictureScrubOptions {
   /** Omit it and the scan runs the pattern tier only. */
   runner?: ModelRunner;
   /** Reads the words out of a picture. Injected so it can be tested. */
-  read?: (blob: Blob) => Promise<OcrTranscript>;
+  read?: (blob: Blob, onProgress?: OcrProgressReporter) => Promise<OcrTranscript>;
+  /** Reports each stage as it starts and finishes. */
+  onProgress?: ProgressReporter;
 }
 
 export interface PictureScrubResult {
@@ -100,9 +108,29 @@ export async function scrubPicture(
 
   let transcript: OcrTranscript;
 
+  options.onProgress?.({
+    id: "read",
+    label: "READING THE PICTURE",
+    status: "running",
+    fraction: null,
+  });
+
   try {
-    transcript = await read(file);
+    transcript = await read(file, (progress) => {
+      options.onProgress?.({
+        id: "read",
+        label: progress.label,
+        status: "running",
+        fraction: progress.fraction,
+      });
+    });
   } catch (error) {
+    options.onProgress?.({
+      id: "read",
+      label: "READING THE PICTURE",
+      status: "done",
+      fraction: 1,
+    });
     return {
       regions: [],
       output: null,
@@ -122,10 +150,18 @@ export async function scrubPicture(
     };
   }
 
+  options.onProgress?.({
+    id: "read",
+    label: "READING THE PICTURE",
+    status: "done",
+    fraction: 1,
+  });
+
   const scan = await scrub(transcript.text, {
     mode: options.mode,
     runner: options.runner,
     context: options.context,
+    onProgress: options.onProgress,
   });
 
   const regions: PictureRegion[] = [];
@@ -150,12 +186,28 @@ export async function scrubPicture(
     });
   }
 
+  options.onProgress?.({
+    id: "cover",
+    label: "COVERING THE WORDS",
+    status: "running",
+    fraction: null,
+  });
+
+  const output = await drawRegions(
+    loaded,
+    regions.map((region) => region.box)
+  );
+
+  options.onProgress?.({
+    id: "cover",
+    label: "COVERING THE WORDS",
+    status: "done",
+    fraction: 1,
+  });
+
   return {
     regions,
-    output: await drawRegions(
-      loaded,
-      regions.map((region) => region.box)
-    ),
+    output,
     transcript: transcript.text,
     source:
       scan.inferenceSource === "IN_CLOUD"

@@ -2,6 +2,7 @@ import { mergeFindings, resolveRetentions } from "./offsets";
 import { toFindings, type ModelRunner, type Tier } from "./model";
 import { findLabelValues } from "./labels";
 import { findPatterns } from "./patterns";
+import type { ProgressReporter } from "./progress";
 import { DEFAULT_CONTEXT } from "./purpose";
 import { describeType } from "./taxonomy";
 import type { Finding, ScanContext, ScanMode, ScanResult } from "./types";
@@ -30,6 +31,8 @@ export interface ScrubOptions {
   runner?: ModelRunner;
   /** What the text is for, and how the clean copy should read. */
   context?: ScanContext;
+  /** Reports each stage as it starts and finishes. */
+  onProgress?: ProgressReporter;
 }
 
 export function chooseTier(text: string, mode: ScanMode): Tier {
@@ -84,9 +87,21 @@ export async function scrub(
   const startedAt = Date.now();
 
   const patternStartedAt = Date.now();
+  options.onProgress?.({
+    id: "rules",
+    label: "THE RULES",
+    status: "running",
+    fraction: null,
+  });
   const labelTier = labelFindings(text);
   const patternFindings = [...labelTier, ...findPatterns(text)];
   const patternsMs = Date.now() - patternStartedAt;
+  options.onProgress?.({
+    id: "rules",
+    label: "THE RULES",
+    status: "done",
+    fraction: 1,
+  });
 
   const base: ScanResult = {
     findings: patternFindings,
@@ -108,6 +123,16 @@ export async function scrub(
   let tier = chooseTier(text, mode);
   const modelStartedAt = Date.now();
 
+  const tierLabel = (which: Tier) =>
+    which === "cloud" ? "THE CLOUD MODEL" : "THE ON-DEVICE MODEL";
+
+  options.onProgress?.({
+    id: "model",
+    label: tierLabel(tier),
+    status: "running",
+    fraction: null,
+  });
+
   let run = await options.runner(text, tier, context);
 
   // An on-device run that fails escalates to the cloud, but only when the
@@ -115,10 +140,23 @@ export async function scrub(
   // is honoured even if it means returning no model findings.
   if (!run.ok && tier === "on_device" && mode === "auto") {
     tier = "cloud";
+    options.onProgress?.({
+      id: "model",
+      label: tierLabel(tier),
+      status: "running",
+      fraction: null,
+    });
     run = await options.runner(text, tier, context);
   }
 
   const modelMs = Date.now() - modelStartedAt;
+
+  options.onProgress?.({
+    id: "model",
+    label: tierLabel(tier),
+    status: "done",
+    fraction: 1,
+  });
 
   if (!run.ok) {
     return {
