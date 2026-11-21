@@ -1,4 +1,5 @@
 import { findPatterns } from "./patterns";
+import type { ProgressReporter } from "./progress";
 import { applyOutput, distinctiveTokens } from "./rewrite";
 import { scrub, chooseTier } from "./scrub";
 import type { LeakRunner, ModelRunner, Tier } from "./model";
@@ -266,17 +267,16 @@ export interface LeakTestOptions {
   mode?: ScanMode;
   /** The scan runner. Omit it and the scan runs the pattern tier only. */
   runner?: ModelRunner;
-  /** The probe runner. Omit it and only the programmatic checks run. */
-  leakRunner?: LeakRunner;
+  /** Reports each stage of the scan as it starts and finishes. */
+  onProgress?: ProgressReporter;
 }
 
 /**
- * Runs the whole leak test: the scan, the clean copy, the programmatic checks,
- * and the model's attempt to work the redaction backwards.
+ * Runs the scrub and the local checks.
  *
- * The probe is only ever shown the clean copy. It never sees a secret, not
- * even in the cloud, so the report cannot leak the thing it is about and the
- * cloud probe carries nothing but the text the user was going to send anyway.
+ * No model is asked anything beyond the scan itself: the two programmatic
+ * checks are arithmetic over the copy and the findings, so they cost nothing
+ * and finish the moment the scan does.
  */
 export async function runLeakTest(
   text: string,
@@ -285,7 +285,12 @@ export async function runLeakTest(
   const mode = options.mode ?? "auto";
   const context = options.context;
 
-  const scan = await scrub(text, { mode, runner: options.runner, context });
+  const scan = await scrub(text, {
+    mode,
+    runner: options.runner,
+    context,
+    onProgress: options.onProgress,
+  });
   const cleanCopy = applyOutput(text, scan.findings, context.outputForm);
 
   const leaks: Leak[] = [
@@ -293,41 +298,67 @@ export async function runLeakTest(
     ...reintroducedPatternLeaks(cleanCopy),
   ];
 
-  let probe: LeakProbe | undefined;
-
-  if (options.leakRunner && text.trim()) {
-    const removedTypes = Array.from(
-      new Set(
-        scan.findings
-          .filter((finding) => finding.decision === "redact")
-          .map((finding) => finding.type)
-      )
-    );
-
-    let tier = chooseTier(cleanCopy, mode);
-    let run = await options.leakRunner(cleanCopy, removedTypes, tier);
-
-    if (!run.ok && tier === "on_device" && mode === "auto") {
-      tier = "cloud";
-      run = await options.leakRunner(cleanCopy, removedTypes, tier);
-    }
-
-    probe = {
-      tier,
-      source: run.source,
-      charsSent: run.charsSent,
-      error: run.ok ? undefined : run.error,
-    };
-
-    if (run.ok) {
-      leaks.push(
-        ...groundClaims(readLeakClaims(run.raw), cleanCopy, scan.findings)
-      );
-    }
-  }
-
   const { verdict, score } = scoreLeaks(leaks);
 
-  return { scan, cleanCopy, leaks, verdict, score, probe };
+  return { scan, cleanCopy, leaks, verdict, score };
+}
+
+export interface LeakProbeOptions {
+  mode?: ScanMode;
+  /** The probe runner. Omit it and nothing happens. */
+  leakRunner?: LeakRunner;
+}
+
+/**
+ * Asks a model to work the redaction backwards.
+ *
+ * This is a second model call on top of the scan, so it is never run unless
+ * the user asks for it. It is also the one thing on the page that can cost
+ * cloud quota, which is another reason to leave it to a button.
+ *
+ * The probe is only ever shown the clean copy. It never sees a secret, not
+ * even in the cloud, so the report cannot leak the thing it is about and the
+ * cloud probe carries nothing but the text the user was going to send anyway.
+ */
+export async function probeLeakTest(
+  result: LeakTestResult,
+  options: LeakProbeOptions
+): Promise<LeakTestResult> {
+  const mode = options.mode ?? "auto";
+  const { scan, cleanCopy } = result;
+
+  if (!options.leakRunner || !cleanCopy.trim()) return result;
+
+  const removedTypes = Array.from(
+    new Set(
+      scan.findings
+        .filter((finding) => finding.decision === "redact")
+        .map((finding) => finding.type)
+    )
+  );
+
+  let tier = chooseTier(cleanCopy, mode);
+  let run = await options.leakRunner(cleanCopy, removedTypes, tier);
+
+  if (!run.ok && tier === "on_device" && mode === "auto") {
+    tier = "cloud";
+    run = await options.leakRunner(cleanCopy, removedTypes, tier);
+  }
+
+  const probe: LeakProbe = {
+    tier,
+    source: run.source,
+    charsSent: run.charsSent,
+    error: run.ok ? undefined : run.error,
+  };
+
+  const inference = run.ok
+    ? groundClaims(readLeakClaims(run.raw), cleanCopy, scan.findings)
+    : [];
+
+  const leaks = [...result.leaks, ...inference];
+  const { verdict, score } = scoreLeaks(leaks);
+
+  return { ...result, leaks, verdict, score, probe };
 }
 

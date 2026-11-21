@@ -5,6 +5,7 @@ import {
   readLeakClaims,
   reintroducedPatternLeaks,
   residualTokenLeaks,
+  probeLeakTest,
   runLeakTest,
   scoreLeaks,
   stripMaskTokens,
@@ -200,11 +201,29 @@ describe("the whole test", () => {
   const text = "Hi, my name is Northwind Logistics, email ada@example.com.";
 
   it("scrubs the text, then reports what the copy still gives away", async () => {
-    const result = await runLeakTest(text, {
+    const scanned = await runLeakTest(text, {
       context: CONTEXT,
       runner: scanRunner(
         '{"findings":[{"type":"PERSON","quote":"Northwind Logistics","decision":"redact","replacement":"a logistics firm"}]}'
       ),
+    });
+
+    expect(scanned.cleanCopy).not.toContain("Northwind");
+    expect(scanned.cleanCopy).not.toContain("ada@example.com");
+    expect(scanned.verdict).toBe("CLEAN");
+    expect(scanned.leaks).toEqual([]);
+    expect(scanned.probe).toBeUndefined();
+  });
+
+  it("runs the model attack only when it is asked for", async () => {
+    const scanned = await runLeakTest(text, {
+      context: CONTEXT,
+      runner: scanRunner(
+        '{"findings":[{"type":"PERSON","quote":"Northwind Logistics","decision":"redact","replacement":"a logistics firm"}]}'
+      ),
+    });
+
+    const result = await probeLeakTest(scanned, {
       leakRunner: async () => ({
         ok: true,
         raw: '{"claims":[{"claim":"The sender says where they work, but the firm is gone.","quote":"my name is"}]}',
@@ -214,10 +233,9 @@ describe("the whole test", () => {
       }),
     });
 
-    expect(result.cleanCopy).not.toContain("Northwind");
-    expect(result.cleanCopy).not.toContain("ada@example.com");
     expect(result.verdict).toBe("TRACEABLE");
     expect(result.leaks.some((leak) => leak.kind === "inference")).toBe(true);
+    expect(result.probe?.charsSent).toBe(0);
   });
 
   it("never hands the original to the probe", async () => {
@@ -234,24 +252,28 @@ describe("the whole test", () => {
       };
     };
 
-    await runLeakTest(text, {
+    const scanned = await runLeakTest(text, {
       context: CONTEXT,
       runner: scanRunner(
         '{"findings":[{"type":"PERSON","quote":"Northwind Logistics","decision":"redact","replacement":"a logistics firm"}]}'
       ),
-      leakRunner,
     });
+
+    await probeLeakTest(scanned, { leakRunner });
 
     expect(seen).not.toContain("Northwind");
     expect(seen).not.toContain("ada@example.com");
   });
 
   it("still gives a verdict when the probe could not run", async () => {
-    const result = await runLeakTest(text, {
+    const scanned = await runLeakTest(text, {
       context: CONTEXT,
       runner: scanRunner(
         '{"findings":[{"type":"PERSON","quote":"Northwind Logistics","decision":"redact","replacement":"a logistics firm"}]}'
       ),
+    });
+
+    const result = await probeLeakTest(scanned, {
       leakRunner: async () => ({
         ok: false,
         raw: "",
@@ -264,5 +286,18 @@ describe("the whole test", () => {
 
     expect(result.probe?.error).toBe("no model");
     expect(result.verdict).toBe("CLEAN");
+  });
+
+  it("leaves the result alone when there is no probe runner", async () => {
+    const scanned = await runLeakTest(text, {
+      context: CONTEXT,
+      runner: scanRunner(
+        '{"findings":[{"type":"PERSON","quote":"Northwind Logistics","decision":"redact","replacement":"a logistics firm"}]}'
+      ),
+    });
+
+    const result = await probeLeakTest(scanned, {});
+
+    expect(result).toBe(scanned);
   });
 });

@@ -10,9 +10,12 @@ import type { OutputForm } from "@/lib/types";
 export function MaskedOutput({
   text,
   form,
+  note,
 }: {
   text: string;
   form: OutputForm;
+  /** Overrides the line under the heading. */
+  note?: string;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -40,9 +43,10 @@ export function MaskedOutput({
       </div>
 
       <p className="mono mt-2 text-faint">
-        {form === "rewritten"
-          ? "EACH SECRET REPLACED BY A GENERIC PHRASE, SO THE SENTENCES STILL READ"
-          : "EACH SECRET REPLACED BY A TOKEN NAMING ITS TYPE"}
+        {note ??
+          (form === "rewritten"
+            ? "EACH SECRET REPLACED BY A GENERIC PHRASE, SO THE SENTENCES STILL READ"
+            : "EACH SECRET REPLACED BY A TOKEN NAMING ITS TYPE")}
       </p>
 
       <pre className="mt-4 max-h-[22rem] overflow-auto whitespace-pre-wrap break-words border border-hairline bg-surface p-4 text-sm leading-relaxed text-text [overflow-wrap:anywhere] sm:max-h-[28rem]">

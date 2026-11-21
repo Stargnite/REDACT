@@ -77,10 +77,15 @@ Work on the **deployed URL**, not localhost, so what you test is what judges get
 - [ ] "WHAT WAS READ OUT OF IT" shows the transcript. ✅
 - [ ] The receipt reads `TEXT SENT: NOTHING` on an ON DEVICE run. ✅
 
-### C5. Leak test — `/leak-test`
+### C5. Proof — `/leak-test`
 
-- [ ] Paste **Corpus A**, run it. ✅ *a verdict, not just a list*
-- [ ] The verdict is a plain-English judgement about what the model tier found. ✅
+- [ ] Paste **Corpus A**, press **CHECK IT**. ✅ *the composer empties and the settings close, the same as the scrub page*
+- [ ] The page answers in two layers. The **first layer runs on its own**: the scan produces a clean copy, and the fixed checks look at that copy for anything pointing back to what was removed. Instant, free, no quota.
+- [ ] The verdict reads `NO TRACE` or `A TRACE` — words about the **copy**, not about the product. ✅ *it never says "LEAKING"*
+- [ ] `N COVERED` on the receipt. If it is **0**, the verdict box says **CANNOT SAY** and shows no risk score. ✅ *there is no redaction to prove*
+- [ ] The traces list is either empty or names the exact span that came back.
+- [ ] **The model attack is a separate button.** Press **ATTACK THE COPY** only when you want the second model call on camera — it is the one thing on this page that can cost a cloud request. See F4 for the quota cost.
+- [ ] If the attack cannot run, the page says **THE MODEL ATTACK DID NOT FINISH**, offers **ATTACK THE COPY AGAIN**, and the verdict line says the judgement is the local checks alone. ✅ *it does not claim the model succeeded*
 
 ### C6. The rest of the site
 
@@ -173,7 +178,7 @@ The free tier is **20 requests a day for the whole project**. Not per user, not 
 | F1 | One smoke test with a trivial prompt (not the scrubber), to prove App Check + the genai config are good | 1 |
 | F2 | The tier comparison in C2, once, on Corpus B | 1 |
 | F3 | The escalation in C3, once | 1 |
-| F4 | The leak test on the cloud tier | 1 |
+| F4 | The model attack on the Proof page | 1 |
 
 **Leave the rest.** If you burn 15 requests testing on Saturday, you cannot record a cloud-tier shot
 on Monday. **Record the demo on the on-device tier**, and treat the cloud as a footnote.
