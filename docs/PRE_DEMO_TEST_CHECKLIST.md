@@ -48,9 +48,10 @@ Work on the **deployed URL**, not localhost, so what you test is what judges get
 
 ### C1. Text scrub — the chat shape
 
-- [ ] Paste **Corpus A** (the form), press Enter. Progress appears: `THE RULES` → `THE ON-DEVICE MODEL`, with the bar sliding and an elapsed clock. ✅ *the bar moves and the clock counts up*
-- [ ] The reply shows the **black-barred document**: your text with real black bars over every covered span. ✅ *bars are black, the text under them is not selectable*
-- [ ] The clean copy below shows `[REDACTED:EMAIL]` style tokens. ✅ *tokens name the type*
+- [ ] Paste **Corpus A** (the form), press Enter. The composer **empties itself** and the preferences panel closes. ✅ *both happen the instant you press scrub*
+- [ ] Your text stays on screen in the `YOUR TEXT` turn above the reply. ✅ *nothing was lost*
+- [ ] Progress appears: `KNOWN FORMATS` → `THE MODEL ON THIS DEVICE`, with the bar sliding and an elapsed clock. ✅ *the bar moves and the clock counts up*
+- [ ] The reply leads with **`YOUR TEXT, REDACTED`** — the clean copy, with `[REDACTED:EMAIL]` style tokens, no black bars over pasted text. ✅ *tokens name the type*
 - [ ] `COPY` puts the clean copy on the clipboard. ✅ *paste it into a text editor to confirm*
 - [ ] The findings list shows each finding with its type and source (PATTERN / MODEL). ✅ *list is not empty*
 - [ ] The receipt strip reads `ON DEVICE · 0 CHARS SENT · N COVERED · N.N S`. ✅ *0 chars sent*
@@ -70,7 +71,7 @@ Work on the **deployed URL**, not localhost, so what you test is what judges get
 ### C4. Picture scrub — `/image`
 
 - [ ] Upload a **screenshot containing real secrets** (Corpus A as a screenshot, or a terminal window with the AWS key).
-- [ ] Progress shows four stages: `READING THE PICTURE` → `THE RULES` → `THE CLOUD MODEL` → `COVERING THE WORDS`. ✅ *the OCR stage reports a real progress fraction*
+- [ ] Progress shows four stages: `READING THE PICTURE` → `KNOWN FORMATS` → `THE MODEL ON THIS DEVICE` → `COVERING THE WORDS`. ✅ *the OCR stage reports a real progress fraction*
 - [ ] The result lists regions with type and pixel coordinates. ✅
 - [ ] **SCRUBBED PICTURE** shows the original with black bars drawn over the words, and **DOWNLOAD THE SCRUBBED PICTURE** works. ✅ *open the download and check the bars are in the right place*
 - [ ] "WHAT WAS READ OUT OF IT" shows the transcript. ✅
@@ -91,8 +92,8 @@ Work on the **deployed URL**, not localhost, so what you test is what judges get
 
 ### C7. Mobile — check at 375 px, not just on your laptop
 
-- [ ] Scan page: composer pinned to the bottom of the screen, context collapsed to one line (`GENERAL · REWRITTEN · AUTO / CHANGE`). ✅
-- [ ] The black-barred document scrolls rather than overflowing the screen. ✅
+- [ ] Scan page: composer pinned to the bottom of the screen, context collapsed to one line (`SETTINGS · GENERAL · REWRITTEN · AUTOMATIC / CHANGE`). ✅
+- [ ] The `YOUR TEXT, REDACTED` copy scrolls rather than overflowing the screen. ✅
 - [ ] `/image` at 375 px: the picture preview fits, the buttons stack. ✅
 - [ ] `/leak-test` at 375 px. ✅
 
@@ -192,8 +193,8 @@ on Monday. **Record the demo on the on-device tier**, and treat the cloud as a f
 | G3 | Screen resolution decided | record at 1920×1080, or capture the window rather than the full screen |
 | G4 | Chrome zoom | **100 %** — the type is small on a laptop and judges watch on a phone |
 | G5 | The composer is empty, the clipboard is empty, and no real secret is in any tab title | — |
-| G6 | One full dry run, timed | the 3-minute script in `HACKATHON_BRIEF.md` §13.6 is written for the **old** UI (a `Scan` button, a `Force cloud` toggle, accept/reject, a privacy receipt). The shipped UI is the chat-shaped scrub with `ENTER TO SCRUB`, a collapsed context line, a **black-barred document**, and **"ASK THE CLOUD TOO"**. **Rewrite the script to the shipped UI** before you record — a shot list that does not match the screen makes you stumble on camera. |
-| G7 | The shots that must exist | ① the problem + stat (0:00) ② paste and scrub with the progress bar visible (0:15) ③ the black-barred document + **empty network panel** (0:45) ④ "ASK THE CLOUD TOO" and the delta (1:05) ⑤ the picture scrub with the bars drawn (1:30) ⑥ the clean copy and the copy button (1:55) ⑦ stack, repo link, "nothing left your machine" (2:30) |
+| G6 | One full dry run, timed | the 3-minute script in `HACKATHON_BRIEF.md` §13.6 is written for the **old** UI (a `Scan` button, a `Force cloud` toggle, accept/reject, a privacy receipt). The shipped UI is the chat-shaped scrub with `ENTER TO SCRUB`, a collapsed settings line, a **`YOUR TEXT, REDACTED`** clean copy, and **"ASK THE CLOUD TOO"**. **Rewrite the script to the shipped UI** before you record — a shot list that does not match the screen makes you stumble on camera. |
+| G7 | The shots that must exist | ① the problem + stat (0:00) ② paste and scrub with the progress bar visible (0:15) ③ the clean copy + **empty network panel** (0:45) ④ "ASK THE CLOUD TOO" and the delta (1:05) ⑤ the picture scrub with the bars drawn (1:30) ⑥ the copy button (1:55) ⑦ stack, repo link, "nothing left your machine" (2:30) |
 
 **Record on this Mac, in Chrome, with the model present.** A recording made on another laptop will
 silently fall back to the cloud and the central claim collapses on camera.

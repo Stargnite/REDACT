@@ -23,7 +23,6 @@ import { MaskedOutput } from "./masked-output";
 import { ModeToggle, modeHint } from "./mode-toggle";
 import { ModelTierNotice } from "./model-tier-notice";
 import { ScrubProgress } from "./progress";
-import { RedactedDocument } from "./redacted-document";
 import { TierCompare } from "./tier-compare";
 
 function formatDuration(ms: number): string {
@@ -32,14 +31,14 @@ function formatDuration(ms: number): string {
 }
 
 const OUTPUT_LABEL: Record<OutputForm, string> = {
-  rewritten: "REWRITTEN",
-  token: "TOKENS",
+  rewritten: "Rewritten",
+  token: "Tokens",
 };
 
 const MODE_LABEL: Record<ScanMode, string> = {
-  auto: "AUTO",
-  on_device: "ON DEVICE",
-  cloud: "CLOUD",
+  auto: "Automatic",
+  on_device: "On this device",
+  cloud: "In the cloud",
 };
 
 /**
@@ -138,6 +137,18 @@ export function ScanPanel() {
     setBusy(true);
     setSteps(TEXT_STEPS);
 
+    // The composer empties the moment the scrub starts, the way a chat box
+    // does once you have sent something. The text is not lost: it is kept in
+    // the turn above the reply, which is where you would look for it.
+    setScannedText(scanned);
+    setText("");
+
+    // The controls close the moment the scrub starts. They are the settings
+    // for this run, and a run that is already under way cannot use them, so
+    // leaving them open would only put a wall of radio buttons between the
+    // user and the progress of the thing they asked for.
+    setControlsOpen(false);
+
     try {
       const next = await scrub(scanned, {
         mode,
@@ -148,7 +159,6 @@ export function ScanPanel() {
 
       setScannedText(scanned);
       setResult(next);
-      setControlsOpen(false);
     } finally {
       setBusy(false);
     }
@@ -200,26 +210,10 @@ export function ScanPanel() {
                     <ScrubProgress steps={steps} running={busy} />
                   ) : result ? (
                     <>
-                      <RedactedDocument
-                        text={scannedText}
-                        findings={result.findings}
-                      />
-
-                      <div className="mt-8">
-                        <MaskedOutput
-                          text={masked}
-                          form={result.context.outputForm}
-                        />
-                      </div>
-
-                      {modelError ? (
-                        <div className="mt-8">
-                          <ModelTierNotice error={modelError} />
-                        </div>
-                      ) : null}
+                      {modelError ? <ModelTierNotice error={modelError} /> : null}
 
                       {result.unmatchedCount ? (
-                        <div className="mt-6">
+                        <div className="mt-4">
                           <EscalationNotice
                             reason={`The model reported ${result.unmatchedCount} span${result.unmatchedCount === 1 ? "" : "s"} that could not be matched to the text, so ${result.unmatchedCount === 1 ? "it is" : "they are"} still uncovered. Treat this scrub as partial.`}
                           />
@@ -227,22 +221,29 @@ export function ScanPanel() {
                       ) : null}
 
                       {result.escalated ? (
-                        <div className="mt-6">
+                        <div className="mt-4">
                           <EscalationNotice reason="The text was larger than the on-device model can hold, so it was sent to the cloud model instead." />
                         </div>
                       ) : null}
 
                       {stale ? (
-                        <p className="mono mt-6 text-accent">
+                        <p className="mono mt-4 text-accent">
                           CONTEXT CHANGED · SCRUB AGAIN TO APPLY IT
                         </p>
                       ) : null}
 
-                      <h3 className="mono mt-8 text-faint">
-                        {result.findings.length} FINDING
+                      <div className="mt-8 first:mt-0">
+                        <MaskedOutput
+                          text={masked}
+                          form={result.context.outputForm}
+                        />
+                      </div>
+
+                      <h3 className="mono mt-10 text-faint">
+                        WHAT WAS FOUND · {result.findings.length} SPAN
                         {result.findings.length === 1 ? "" : "S"}
                         {result.retainedCount > 0
-                          ? ` · ${result.retainedCount} KEPT`
+                          ? ` · ${result.retainedCount} KEPT ON PURPOSE`
                           : ""}
                       </h3>
 
@@ -314,10 +315,11 @@ export function ScanPanel() {
           <button
             type="button"
             onClick={() => setControlsOpen(true)}
-            aria-label={`Context: ${purposeSpec(purpose).label}, ${OUTPUT_LABEL[outputForm]}, ${MODE_LABEL[mode]}. Change it.`}
+            aria-label={`Settings: purpose ${purposeSpec(purpose).label}, output ${OUTPUT_LABEL[outputForm]}, tier ${MODE_LABEL[mode]}. Change them.`}
             className="mono flex w-full items-center justify-between gap-3 text-faint transition-colors duration-150 hover:text-accent"
           >
             <span>
+              <span className="text-faint">SETTINGS</span> ·{" "}
               {purposeSpec(purpose).label} · {OUTPUT_LABEL[outputForm]} ·{" "}
               {MODE_LABEL[mode]}
             </span>

@@ -89,7 +89,7 @@ export async function scrub(
   const patternStartedAt = Date.now();
   options.onProgress?.({
     id: "rules",
-    label: "THE RULES",
+    label: "KNOWN FORMATS",
     status: "running",
     fraction: null,
   });
@@ -98,7 +98,7 @@ export async function scrub(
   const patternsMs = Date.now() - patternStartedAt;
   options.onProgress?.({
     id: "rules",
-    label: "THE RULES",
+    label: "KNOWN FORMATS",
     status: "done",
     fraction: 1,
   });
@@ -124,7 +124,7 @@ export async function scrub(
   const modelStartedAt = Date.now();
 
   const tierLabel = (which: Tier) =>
-    which === "cloud" ? "THE CLOUD MODEL" : "THE ON-DEVICE MODEL";
+    which === "cloud" ? "THE MODEL IN THE CLOUD" : "THE MODEL ON THIS DEVICE";
 
   options.onProgress?.({
     id: "model",

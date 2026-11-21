@@ -28,17 +28,23 @@ export interface ProgressStep {
 
 export type ProgressReporter = (step: ProgressStep) => void;
 
-/** The stages a text scrub goes through. */
+/**
+ * The stages a text scrub goes through.
+ *
+ * The labels are written for someone who has never heard of a model tier.
+ * "THE ON-DEVICE MODEL" is what the code calls it; "THE MODEL ON THIS DEVICE"
+ * is what it means to the person waiting.
+ */
 export const TEXT_STEPS: ProgressStep[] = [
-  { id: "rules", label: "THE RULES", status: "pending", fraction: null },
-  { id: "model", label: "THE ON-DEVICE MODEL", status: "pending", fraction: null },
+  { id: "rules", label: "KNOWN FORMATS", status: "pending", fraction: null },
+  { id: "model", label: "THE MODEL ON THIS DEVICE", status: "pending", fraction: null },
 ];
 
 /** The stages a picture scrub goes through. */
 export const PICTURE_STEPS: ProgressStep[] = [
   { id: "read", label: "READING THE PICTURE", status: "pending", fraction: null },
-  { id: "rules", label: "THE RULES", status: "pending", fraction: null },
-  { id: "model", label: "THE ON-DEVICE MODEL", status: "pending", fraction: null },
+  { id: "rules", label: "KNOWN FORMATS", status: "pending", fraction: null },
+  { id: "model", label: "THE MODEL ON THIS DEVICE", status: "pending", fraction: null },
   { id: "cover", label: "COVERING THE WORDS", status: "pending", fraction: null },
 ];
 
