@@ -749,18 +749,16 @@ Gemini Nano.
 
 ### 13.6 3-minute video script
 
-| Time | Shot |
-|---|---|
-| 0:00–0:15 | The problem + one stat: "29M secrets leaked on GitHub in 2025. AI-assisted commits leak at 2× the rate." |
-| 0:15–0:45 | Paste a realistic log containing an AWS key, an email, a phone number, a patient name. Hit **Scan**. |
-| 0:45–1:05 | **ON DEVICE** badge lights up. Findings highlight. Text never left — show the empty network panel. |
-| 1:05–1:30 | Toggle **Force cloud** → same input → **CLOUD** badge → deeper/different findings. Side-by-side comparison. |
-| 1:30–1:55 | Paste a long document → the token meter crosses 9,216 → app says "this will be scanned in the cloud" and does so. |
-| 1:55–2:30 | Accept/reject findings, mask, copy the redacted output. Open the **privacy receipt**. |
-| 2:30–3:00 | Tech stack, repo link, "free, no signup, nothing leaves your machine." |
+**Superseded — see [`VIDEO_SCRIPT.md`](VIDEO_SCRIPT.md).**
 
-Record it on the **fixed** machine with the model actually running. A video that shows the real
-on-device path is worth more than a nicer product with a fallback.
+The script below was written against the UI as it was on 20 Nov 2026: a `Scan` button, a `Force
+cloud` toggle, accept/reject buttons on each finding, a privacy-receipt panel, and a token meter
+that crossed 9,216. None of that shipped. The app is now a chat-shaped scrub with `ENTER TO SCRUB`,
+a collapsible settings line, a `YOUR TEXT, REDACTED` clean copy, and an `ASK THE CLOUD TOO` button
+that runs the second tier on demand.
+
+`VIDEO_SCRIPT.md` is the shot list to record from — 2:45, timed, with voiceover, written against
+the shipped screen.
 
 ---
 

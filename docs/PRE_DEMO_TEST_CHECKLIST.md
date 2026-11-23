@@ -186,7 +186,7 @@ on Monday. **Record the demo on the on-device tier**, and treat the cloud as a f
 | G3 | Screen resolution decided | record at 1920×1080, or capture the window rather than the full screen |
 | G4 | Chrome zoom | **100 %** — the type is small on a laptop and judges watch on a phone |
 | G5 | The composer is empty, the clipboard is empty, and no real secret is in any tab title | — |
-| G6 | One full dry run, timed | the 3-minute script in `HACKATHON_BRIEF.md` §13.6 is written for the **old** UI (a `Scan` button, a `Force cloud` toggle, accept/reject, a privacy receipt). The shipped UI is the chat-shaped scrub with `ENTER TO SCRUB`, a collapsed settings line, a **`YOUR TEXT, REDACTED`** clean copy, and **"ASK THE CLOUD TOO"**. **Rewrite the script to the shipped UI** before you record — a shot list that does not match the screen makes you stumble on camera. |
+| G6 | One full dry run, timed | The script is **`VIDEO_SCRIPT.md`** — written against the shipped UI (the chat-shaped scrub, `ENTER TO SCRUB`, the collapsed settings line, `YOUR TEXT, REDACTED`, `ASK THE CLOUD TOO`). It is a 2:45 shot list with timings and voiceover. **Warm the model before recording** — a cold Gemini Nano takes ~98 s on the first inference and would eat a third of the video. |
 | G7 | The shots that must exist | ① the problem + stat (0:00) ② paste and scrub with the progress bar visible (0:15) ③ the clean copy + **empty network panel** (0:45) ④ "ASK THE CLOUD TOO" and the delta (1:05) ⑤ the picture scrub with the bars drawn (1:30) ⑥ the copy button (1:55) ⑦ stack, repo link, "nothing left your machine" (2:30) |
 
 **Record on this Mac, in Chrome, with the model present.** A recording made on another laptop will
