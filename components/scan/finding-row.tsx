@@ -17,19 +17,25 @@ const DECORATION: Record<Severity, { style: string; thickness: string }> = {
 export function FindingRow({ finding }: { finding: Finding }) {
   const [masked, setMasked] = useState(true);
   const decoration = DECORATION[finding.severity];
+  const kept = finding.decision === "retain";
 
   return (
     <li className="border-b border-hairline py-5 transition-colors duration-150 hover:bg-[rgba(255,74,28,0.1)]">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <span className="mono text-faint">{finding.label}</span>
         <span className="mono text-faint">
+          {kept ? "KEPT · " : ""}
           {finding.source === "pattern" ? "PATTERN" : "MODEL"}
         </span>
       </div>
 
       <p className="mt-2 break-words text-text">
-        {masked ? (
-          <span className="mono text-muted">[REDACTED:{finding.type}]</span>
+        {kept ? (
+          <span className="mono text-muted">{finding.quote}</span>
+        ) : masked ? (
+          <span className="mono text-muted">
+            {finding.replacement ?? `[REDACTED:${finding.type}]`}
+          </span>
         ) : (
           <span
             style={{
@@ -44,13 +50,21 @@ export function FindingRow({ finding }: { finding: Finding }) {
         )}
       </p>
 
-      <button
-        type="button"
-        onClick={() => setMasked((previous) => !previous)}
-        className="mono mt-3 text-muted transition-colors duration-150 hover:text-accent"
-      >
-        {masked ? "Show the match" : "Hide the match"}
-      </button>
+      {finding.reason ? (
+        <p className="mt-2 max-w-[52ch] text-sm leading-relaxed text-muted">
+          {finding.reason}
+        </p>
+      ) : null}
+
+      {kept ? null : (
+        <button
+          type="button"
+          onClick={() => setMasked((previous) => !previous)}
+          className="mono mt-3 text-muted transition-colors duration-150 hover:text-accent"
+        >
+          {masked ? "Show the match" : "Hide the match"}
+        </button>
+      )}
     </li>
   );
 }

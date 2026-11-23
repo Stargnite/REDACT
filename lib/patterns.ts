@@ -41,6 +41,7 @@ export function findPatterns(text: string): Finding[] {
             start: match.index + offset,
             end: match.index + offset + value.length,
             source: "pattern",
+            decision: "redact",
           });
         }
       }

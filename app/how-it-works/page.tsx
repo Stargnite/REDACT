@@ -12,7 +12,7 @@ const TIERS = [
   {
     index: "01",
     title: "The pattern tier",
-    body: "Twenty-one rules run against the text in your browser. A credential has a fixed shape, so a rule is more reliable than a model for it, and it costs nothing to run. The pattern tier always runs, even with no network.",
+    body: "Twenty-one rules run against the text in your browser, and a set of field labels runs with them. A form that writes FULL NAME over a name has told us what the name is, so it is covered whether or not the model happened to notice it that day. A credential has a fixed shape, so a rule is more reliable than a model for it, and it costs nothing to run. The pattern tier always runs, even with no network.",
   },
   {
     index: "02",
@@ -96,6 +96,35 @@ export default function HowItWorksPage() {
           page reads the same in greyscale, in bright sunlight, and for
           someone who cannot tell vermilion from anything else.
         </p>      </section>
+
+      <section className="mx-auto mt-[clamp(7rem,14vw,12rem)] max-w-[var(--content-w)] px-[var(--gutter)]">
+        <SectionLabel index="03">Pictures</SectionLabel>
+        <Hairline className="mt-6" />
+
+        <Reveal>
+          <div className="measure-tight pt-7">
+            <p className="text-muted">
+              A screenshot carries more identifying detail than the text you
+              copy out of it, and none of it is text you can paste. So the
+              picture scrubber works in two halves: an optical character reader
+              runs in your browser and finds the words and the pixels each word
+              covers, and then the same two tiers scan that text.
+            </p>
+            <p className="mt-6 text-muted">
+              The words are found by reading, not by asking a model where they
+              are. A model can tell you what a screenshot says, but it cannot
+              reliably tell you which pixels the address is in, and a black bar
+              across the wrong part of a screenshot is worse than a missed
+              secret: you cannot tell a redaction from a mistake. Every span
+              that comes back is matched to the words it covers, so the bar
+              lands on the text it is meant to hide. The picture itself is
+              never sent anywhere, and the copy that comes back is drawn in
+              the browser, so it carries none of the metadata the original
+              had.
+            </p>
+          </div>
+        </Reveal>
+      </section>
     </>
   );
 }

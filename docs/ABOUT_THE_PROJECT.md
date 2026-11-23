@@ -51,13 +51,22 @@ you send it anywhere.
    served through the Firebase AI Logic SDK. REDACT tells you it did this, why, and exactly how
    many bytes went out.
 
-**What you get back:** the original text with every finding highlighted and typed. Each one can
-be masked, unmasked, or rejected individually. One click copies the redacted version.
+**What you get back:** a clean copy of your text with every sensitive span replaced by a token
+that names the type and nothing about the value — `[REDACTED:EMAIL]`, `[REDACTED:AWS_KEY]` — so
+the copy stays readable, and one click takes it to the clipboard. Underneath, every finding is
+listed with its type, where it came from (the rule tier or the model) and why it was flagged, and
+you can reveal any individual match to check it.
+
+**Pictures too.** `/image` reads a screenshot with an OCR engine that runs in a worker in your
+browser — not a vision model, which would have meant uploading the picture. It gets the words and
+their pixel boxes, scans the transcript through the same tiers, and draws black bars over the
+original image. The picture itself never reaches a server, in any tier.
 
 **What REDACT never does:** send your text anywhere it wasn't asked to, store your text, or
-store the secrets it found. The only thing that reaches the database is a **privacy receipt** —
-a metadata-only record (character count, finding counts by type, which model ran, how long it
-took) that lets you prove what happened without revealing what was in it.
+store the secrets it found. The **privacy receipt** at the end of every scan — character count,
+finding counts by type, which model ran, how long it took — is generated in the page and discarded
+when you close the tab. There is no database of your text, because there is nowhere for one to
+live.
 
 And the **inference badge** — a live `ON DEVICE` / `IN CLOUD` indicator — means the hybrid
 architecture is visible, not claimed. You can watch it flip when a long input escalates.
@@ -91,9 +100,10 @@ The SDK reports which runtime actually served the request on `response.inference
 is what drives the badge. Cloud and on-device parameters are configured side by side, so a mode
 switch is a one-line change rather than a separate code path.
 
-On top of that: **App Check** (enforced for AI Logic, with debug tokens for local development),
-**anonymous Auth**, **Firestore** for the privacy receipts, and **Remote Config** for flipping
-the default model and mode without a release.
+On top of that: **App Check**, enforced for AI Logic, with debug tokens for local development —
+and a build step that fails if the debug token ever finds its way into a shipped bundle. There is
+no Auth, no Firestore and no Remote Config in the critical path: the app needs only the Firebase
+web config, and it degrades to a working patterns-only scrubber without any of them.
 
 The parser is the part we spent the most time on, and it is deliberately paranoid: the model is
 asked to return the **exact substring** it found, and we locate that string in the source
@@ -151,9 +161,10 @@ the SDK's own `inferenceSource`, not on our guess. We can demo it live: a short 
 local, a long one escalates with a notice, and the network can be pulled to prove the local
 path is genuine.
 
-**The most sensitive data never has a copy.** The Firestore receipt stores counts and model
-metadata and nothing else. The architecture makes it *impossible* to leak the scanned text
-through our own telemetry, because we never send it anywhere.
+**The most sensitive data never has a copy.** The receipt is computed in the page and thrown
+away with the tab — there is no store of scanned text to leak, no analytics, no beacon. The
+architecture makes it *impossible* to leak the scanned text through our own telemetry, because we
+never send it anywhere.
 
 **Zero backend, zero cost.** We shipped a full-stack-feeling application on the free plan, with
 no server to run, no billing account to set up, and no API key to protect — because every
@@ -201,9 +212,11 @@ need to say *which* patterns are forbidden for them, and to enforce it consisten
 Remote Config-driven rules layer plus a shared receipt view: "here's what our org leaked this
 month," without storing what it was.
 
-**Beyond text.** The on-device model accepts image input, and screenshots of terminals,
-Slack threads and whiteboards are a large and growing share of real secret leaks. The
-architecture already supports it — the current version just doesn't use it yet.
+**Beyond text.** Screenshots of terminals, Slack threads and whiteboards are a large and
+growing share of real secret leaks, so the picture path is already in the app: a self-hosted
+OCR engine reads the words and their pixel boxes in the browser, the same tiers scan the
+transcript, and black bars are drawn over the original image. The next step is tighter
+region detection, not a different architecture.
 
 **Stronger on-device detection.** The model currently runs a general prompt. A smaller,
 purpose-built prompt with few-shot examples, plus a locally cached copy of the team's own

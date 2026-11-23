@@ -29,6 +29,11 @@ const FACTS = [
     title: "The counter is the receipt",
     body: "Every scan ends with a line telling you how many characters went in and how many went out. On device it reads zero sent. In the cloud it reads the exact number. Nothing is left for you to infer.",
   },
+  {
+    index: "05",
+    title: "A picture is read, not uploaded",
+    body: "The picture you pick is decoded and read in the page, by an optical character reader that runs in a worker on your machine, and it is drawn on with black bars. The picture itself never reaches a server, in any tier. What can leave is the text read out of it, and the receipt says how many characters went and when.",
+  },
 ];
 
 export default function PrivacyPage() {

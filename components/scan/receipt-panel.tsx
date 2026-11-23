@@ -1,5 +1,6 @@
 import { Hairline, SectionLabel } from "@/components/site/section-label";
 import { explainModelError } from "@/lib/errors";
+import { purposeSpec } from "@/lib/purpose";
 import type { ScanResult } from "@/lib/types";
 
 function formatDuration(ms: number): string {
@@ -13,8 +14,11 @@ function formatDuration(ms: number): string {
  */
 export function ReceiptPanel({ result }: { result: ScanResult }) {
   const rows: [string, string][] = [
+    ["PURPOSE", purposeSpec(result.context.purpose).label],
+    ["OUTPUT", result.context.outputForm === "rewritten" ? "REWRITTEN" : "TOKENS"],
     ["TIER", result.inferenceSource.replace(/_/g, " ")],
     ["FINDINGS", String(result.findings.length)],
+    ["KEPT", String(result.retainedCount)],
     ["PATTERN TIER", `${result.patternCount} · ${formatDuration(result.durations.patternsMs)}`],
     ["MODEL TIER", `${result.modelCount} · ${formatDuration(result.durations.modelMs)}`],
     ["TOTAL", formatDuration(result.durations.totalMs)],

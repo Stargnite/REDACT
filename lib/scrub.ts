@@ -1,7 +1,11 @@
-import { mergeFindings } from "./offsets";
+import { mergeFindings, resolveRetentions } from "./offsets";
 import { toFindings, type ModelRunner, type Tier } from "./model";
+import { findLabelValues } from "./labels";
 import { findPatterns } from "./patterns";
-import type { ScanMode, ScanResult } from "./types";
+import type { ProgressReporter } from "./progress";
+import { DEFAULT_CONTEXT } from "./purpose";
+import { describeType } from "./taxonomy";
+import type { Finding, ScanContext, ScanMode, ScanResult } from "./types";
 
 /**
  * A rough token estimate. The real on-device window is reported by the
@@ -25,12 +29,46 @@ export interface ScrubOptions {
   mode?: ScanMode;
   /** Omit it and the scan runs the pattern tier only. */
   runner?: ModelRunner;
+  /** What the text is for, and how the clean copy should read. */
+  context?: ScanContext;
+  /** Reports each stage as it starts and finishes. */
+  onProgress?: ProgressReporter;
 }
 
-function chooseTier(text: string, mode: ScanMode): Tier {
+export function chooseTier(text: string, mode: ScanMode): Tier {
   if (mode === "cloud") return "cloud";
   if (mode === "on_device") return "on_device";
   return estimateTokens(text) > ON_DEVICE_TOKEN_BUDGET ? "cloud" : "on_device";
+}
+
+/**
+ * The values written under a field label.
+ *
+ * A form says what its fields hold, so the field is sensitive whatever a
+ * small model happened to notice that day. And the on-device model is small:
+ * asked to read a form, it will sometimes report the name and the email and
+ * leave the address alone. Coverage that depends on the model's recall is
+ * coverage that comes and goes, so the fields a form is built from are covered
+ * here instead.
+ *
+ * These are pattern-tier findings, so a purpose that says a field is needed
+ * can still keep it.
+ */
+function labelFindings(text: string): Finding[] {
+  return findLabelValues(text).map((value) => {
+    const description = describeType(value.type);
+
+    return {
+      type: value.type,
+      label: description.label,
+      severity: description.severity,
+      quote: value.quote,
+      start: value.start,
+      end: value.end,
+      source: "pattern",
+      decision: "redact",
+    };
+  });
 }
 
 /**
@@ -45,11 +83,25 @@ export async function scrub(
   options: ScrubOptions = {}
 ): Promise<ScanResult> {
   const mode = options.mode ?? "auto";
+  const context = options.context ?? DEFAULT_CONTEXT;
   const startedAt = Date.now();
 
   const patternStartedAt = Date.now();
-  const patternFindings = findPatterns(text);
+  options.onProgress?.({
+    id: "rules",
+    label: "KNOWN FORMATS",
+    status: "running",
+    fraction: null,
+  });
+  const labelTier = labelFindings(text);
+  const patternFindings = [...labelTier, ...findPatterns(text)];
   const patternsMs = Date.now() - patternStartedAt;
+  options.onProgress?.({
+    id: "rules",
+    label: "KNOWN FORMATS",
+    status: "done",
+    fraction: 1,
+  });
 
   const base: ScanResult = {
     findings: patternFindings,
@@ -59,6 +111,8 @@ export async function scrub(
     charsSent: 0,
     patternCount: patternFindings.length,
     modelCount: 0,
+    retainedCount: 0,
+    context,
     durations: { patternsMs, modelMs: 0, totalMs: Date.now() - startedAt },
   };
 
@@ -69,17 +123,40 @@ export async function scrub(
   let tier = chooseTier(text, mode);
   const modelStartedAt = Date.now();
 
-  let run = await options.runner(text, tier);
+  const tierLabel = (which: Tier) =>
+    which === "cloud" ? "THE MODEL IN THE CLOUD" : "THE MODEL ON THIS DEVICE";
+
+  options.onProgress?.({
+    id: "model",
+    label: tierLabel(tier),
+    status: "running",
+    fraction: null,
+  });
+
+  let run = await options.runner(text, tier, context);
 
   // An on-device run that fails escalates to the cloud, but only when the
   // user asked for automatic behaviour. A deliberate "on device only" choice
   // is honoured even if it means returning no model findings.
   if (!run.ok && tier === "on_device" && mode === "auto") {
     tier = "cloud";
-    run = await options.runner(text, tier);
+    options.onProgress?.({
+      id: "model",
+      label: tierLabel(tier),
+      status: "running",
+      fraction: null,
+    });
+    run = await options.runner(text, tier, context);
   }
 
   const modelMs = Date.now() - modelStartedAt;
+
+  options.onProgress?.({
+    id: "model",
+    label: tierLabel(tier),
+    status: "done",
+    fraction: 1,
+  });
 
   if (!run.ok) {
     return {
@@ -89,8 +166,34 @@ export async function scrub(
     };
   }
 
-  const { findings: modelFindings } = toFindings(text, run.raw);
-  const findings = mergeFindings([...patternFindings, ...modelFindings]);
+  const { findings: modelFindings, error: parseError, dropped } = toFindings(
+    text,
+    run.raw,
+    context
+  );
+
+  // A field label knows what its own field holds, so it settles the type of
+  // the span it covers. A model finding about the same words is dropped: it
+  // says nothing the label does not already say, and it says it less well.
+  const beyondLabels = modelFindings.filter(
+    (finding) =>
+      !labelTier.some(
+        (label) =>
+          finding.start >= label.start && finding.end <= label.end
+      )
+  );
+
+  const resolved = resolveRetentions([...patternFindings, ...beyondLabels]);
+  const findings = mergeFindings(resolved);
+  const retainedCount = findings.filter(
+    (finding) => finding.decision === "retain"
+  ).length;
+
+  // A model answer that cannot be read means the model tier did not finish.
+  // A span that cannot be placed means something was missed. They are
+  // reported apart: the first is a broken run, the second is a gap in the
+  // cover, and the user needs to be able to tell them apart.
+  const degradedReason = parseError;
 
   // The badge and the character counter report where the scan actually ran,
   // not where it was aimed. In auto mode a run that ended up in the cloud
@@ -104,8 +207,12 @@ export async function scrub(
     escalated: mode === "auto" && ranInCloud,
     charCount: text.length,
     charsSent: run.charsSent,
-    patternCount: patternFindings.length,
-    modelCount: modelFindings.length,
+    patternCount: findings.filter((finding) => finding.source === "pattern").length,
+    modelCount: findings.filter((finding) => finding.source === "model").length,
+    retainedCount,
+    context,
+    degradedReason,
+    unmatchedCount: dropped,
     durations: { patternsMs, modelMs, totalMs: Date.now() - startedAt },
   };
 }

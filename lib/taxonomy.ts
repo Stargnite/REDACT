@@ -21,6 +21,8 @@ const TABLE: [string, string, Severity][] = [
   ["SLACK_WEBHOOK", "SLACK WEBHOOK", "critical"],
   ["NPM_TOKEN", "NPM TOKEN", "critical"],
   ["TWILIO_ACCOUNT_SID", "TWILIO SID", "critical"],
+  ["API_KEY", "API KEY", "critical"],
+  ["PASSWORD", "PASSWORD", "critical"],
   ["CREDIT_CARD", "CARD NUMBER", "high"],
   ["IBAN", "IBAN", "high"],
   ["EMAIL", "EMAIL", "high"],
