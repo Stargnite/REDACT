@@ -26,6 +26,12 @@ function formatBytes(bytes: number): string {
 
 const ACCEPTED = "image/png,image/jpeg,image/webp";
 
+const MODE_LABEL: Record<ScanMode, string> = {
+  auto: "Automatic",
+  on_device: "On this device",
+  cloud: "In the cloud",
+};
+
 export function ImagePanel() {
   const [file, setFile] = useState<File | null>(null);
   const [mode, setMode] = useState<ScanMode>("auto");
@@ -36,6 +42,7 @@ export function ImagePanel() {
   const [steps, setSteps] = useState<ProgressStep[]>(PICTURE_STEPS);
   const [dragging, setDragging] = useState(false);
   const [rejected, setRejected] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const runner = useMemo(() => createModelRunner(), []);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -153,12 +160,40 @@ export function ImagePanel() {
   return (
     <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-16">
       <div className="min-w-0">
-        <PurposePicker
-          purpose={purpose}
-          onChange={setPurpose}
-          note={purposeNote}
-          onNoteChange={setPurposeNote}
-        />
+        <button
+          type="button"
+          onClick={() => setSettingsOpen((open) => !open)}
+          aria-expanded={settingsOpen}
+          aria-controls="picture-settings"
+          aria-label={`${settingsOpen ? "Hide" : "Show"} settings. Purpose ${purposeSpec(purpose).label}, tier ${MODE_LABEL[mode]}.`}
+          className="mono flex w-full items-center justify-between gap-3 text-faint transition-colors duration-150 hover:text-accent"
+        >
+          <span>
+            <span className="text-faint">SETTINGS</span> ·{" "}
+            {purposeSpec(purpose).label} · {MODE_LABEL[mode]}
+          </span>
+          <span className="shrink-0 text-accent">
+            {settingsOpen ? "HIDE" : "CHANGE"}
+          </span>
+        </button>
+
+        {settingsOpen ? (
+          <div id="picture-settings" className="grid gap-5 pt-6">
+            <PurposePicker
+              purpose={purpose}
+              onChange={setPurpose}
+              note={purposeNote}
+              onNoteChange={setPurposeNote}
+            />
+
+            <div>
+              <ModeToggle value={mode} onChange={setMode} subject="picture" />
+              <p className="mt-3 max-w-[46ch] text-sm leading-relaxed text-muted">
+                {modeHint(mode, "picture")}
+              </p>
+            </div>
+          </div>
+        ) : null}
 
         <label htmlFor="picture" className="mono mt-8 block text-faint">
           PICTURE TO SCRUB
@@ -230,9 +265,7 @@ export function ImagePanel() {
 
         {rejected ? <p className="mono mt-4 text-accent">{rejected}</p> : null}
 
-        <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
-          <ModeToggle value={mode} onChange={setMode} subject="picture" />
-
+        <div className="mt-6">
           <button
             type="button"
             onClick={run}
@@ -242,10 +275,6 @@ export function ImagePanel() {
             {busy ? "Scrubbing" : "Scrub the picture"}
           </button>
         </div>
-
-        <p className="mt-3 max-w-[46ch] text-sm leading-relaxed text-muted">
-          {modeHint(mode, "picture")}
-        </p>
 
         {!runner ? (
           <p className="mono mt-5 text-faint">MODEL TIER OFFLINE</p>
